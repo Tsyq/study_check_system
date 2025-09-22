@@ -2,6 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
 const { authenticateToken } = require('../middleware/auth');
+const { Op } = require('sequelize');
 
 const router = express.Router();
 
@@ -26,7 +27,9 @@ router.post('/register', async (req, res) => {
 
     // 检查用户是否已存在
     const existingUser = await User.findOne({
-      $or: [{ email }, { username }]
+      where: {
+        [Op.or]: [{ email }, { username }]
+      }
     });
 
     if (existingUser) {
@@ -40,21 +43,9 @@ router.post('/register', async (req, res) => {
       password
     });
 
-    // 生成token
-    const token = generateToken(user.id);
-
     res.status(201).json({
-      message: '注册成功',
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        avatar: user.avatar,
-        bio: user.bio,
-        totalStudyTime: user.total_study_time,
-        streak: user.streak
-      }
+      message: '注册成功，请登录',
+      success: true
     });
   } catch (error) {
     console.error('注册错误:', error);
@@ -116,26 +107,29 @@ router.post('/login', async (req, res) => {
 // 获取当前用户信息
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id)
-      .populate('followers', 'username avatar')
-      .populate('following', 'username avatar')
-      .select('-password');
+    const user = await User.findByPk(req.user.id, {
+      attributes: { exclude: ['password'] }
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: '用户不存在' });
+    }
 
     res.json({
       user: {
-        id: user._id,
+        id: user.id,
         username: user.username,
         email: user.email,
         avatar: user.avatar,
         bio: user.bio,
-        studyGoals: user.studyGoals,
-        totalStudyTime: user.totalStudyTime,
+        studyGoals: user.study_goals,
+        totalStudyTime: user.total_study_time,
         streak: user.streak,
-        lastCheckinDate: user.lastCheckinDate,
-        followers: user.followers,
-        following: user.following,
+        lastCheckinDate: user.last_checkin_date,
+        followers: 0, // 需要单独查询关注关系
+        following: 0,
         role: user.role,
-        createdAt: user.createdAt
+        createdAt: user.created_at
       }
     });
   } catch (error) {
@@ -148,13 +142,15 @@ router.get('/me', authenticateToken, async (req, res) => {
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
     const { username, bio, avatar } = req.body;
-    const userId = req.user._id;
+    const userId = req.user.id;
 
     // 检查用户名是否已被其他用户使用
     if (username && username !== req.user.username) {
-      const existingUser = await User.findOne({ 
-        username, 
-        _id: { $ne: userId } 
+      const existingUser = await User.findOne({
+        where: {
+          username,
+          id: { [Op.ne]: userId }
+        }
       });
       if (existingUser) {
         return res.status(400).json({ message: '用户名已被使用' });
@@ -166,22 +162,25 @@ router.put('/profile', authenticateToken, async (req, res) => {
     if (bio !== undefined) updateData.bio = bio;
     if (avatar !== undefined) updateData.avatar = avatar;
 
-    const user = await User.findByIdAndUpdate(
-      userId,
-      updateData,
-      { new: true, select: '-password' }
-    );
+    const user = await User.update(updateData, {
+      where: { id: userId },
+      returning: true
+    });
+
+    const updatedUser = await User.findByPk(userId, {
+      attributes: { exclude: ['password'] }
+    });
 
     res.json({
       message: '个人信息更新成功',
       user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        avatar: user.avatar,
-        bio: user.bio,
-        totalStudyTime: user.totalStudyTime,
-        streak: user.streak
+        id: updatedUser.id,
+        username: updatedUser.username,
+        email: updatedUser.email,
+        avatar: updatedUser.avatar,
+        bio: updatedUser.bio,
+        totalStudyTime: updatedUser.total_study_time,
+        streak: updatedUser.streak
       }
     });
   } catch (error) {
@@ -203,8 +202,8 @@ router.put('/password', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: '新密码至少需要6个字符' });
     }
 
-    const user = await User.findById(req.user._id);
-    
+    const user = await User.findByPk(req.user.id);
+
     // 验证当前密码
     const isCurrentPasswordValid = await user.comparePassword(currentPassword);
     if (!isCurrentPasswordValid) {
