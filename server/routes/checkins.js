@@ -31,16 +31,6 @@ router.post('/', authenticateToken, async (req, res) => {
     if (studyTime <= 0) return res.status(400).json({ message: '学习时长必须大于0' });
 
     const now = new Date();
-    const todayStart = new Date(now); todayStart.setHours(0,0,0,0);
-    const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1);
-
-    const existing = await Checkin.findOne({
-      where: {
-        user_id: req.user.id,
-        createdAt: { [Op.gte]: todayStart, [Op.lt]: todayEnd }
-      }
-    });
-    if (existing) return res.status(400).json({ message: '今天已经打卡过了' });
 
     const created = await Checkin.create({
       user_id: req.user.id,
@@ -119,10 +109,34 @@ router.get('/', optionalAuth, async (req, res) => {
       where,
       order: [[sortBy, sortOrder.toLowerCase() === 'desc' ? 'DESC' : 'ASC']],
       offset,
-      limit: parseInt(limit)
+      limit: parseInt(limit),
+      include: [{
+        model: User,
+        attributes: ['id', 'username', 'avatar'],
+        as: 'user'
+      }]
     });
 
-    const checkins = result.rows.map(mapCheckin);
+    const checkins = result.rows.map(c => ({
+      _id: c.id,
+      content: c.content,
+      studyTime: c.study_time,
+      subject: c.subject,
+      images: c.images || [],
+      mood: c.mood,
+      location: c.location,
+      likes: c.likes || [],
+      comments: c.comments || [],
+      isPublic: c.is_public,
+      tags: c.tags || [],
+      createdAt: c.createdAt,
+      user: c.user ? {
+        _id: c.user.id,
+        username: c.user.username,
+        avatar: c.user.avatar
+      } : null
+    }));
+
     return res.json({
       checkins,
       pagination: {

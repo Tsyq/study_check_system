@@ -28,10 +28,14 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   useEffect(() => {
     if (token && user) {
-      const newSocket = io(process.env.REACT_APP_API_URL || 'http://localhost:5000', {
+      const socketUrl = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
+      const newSocket = io(socketUrl, {
         auth: {
           token
-        }
+        },
+        transports: ['websocket', 'polling'],
+        timeout: 20000,
+        forceNew: true
       });
 
       newSocket.on('connect', () => {
@@ -40,8 +44,13 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         newSocket.emit('join-study-circle', user.id);
       });
 
-      newSocket.on('disconnect', () => {
-        console.log('Socket连接断开');
+      newSocket.on('connect_error', (error) => {
+        console.error('Socket连接失败:', error);
+        setIsConnected(false);
+      });
+
+      newSocket.on('disconnect', (reason) => {
+        console.log('Socket连接断开:', reason);
         setIsConnected(false);
       });
 

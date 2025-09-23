@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Card, 
-  Row, 
-  Col, 
-  Typography, 
-  List, 
-  Avatar, 
-  Tag, 
+import {
+  Card,
+  Row,
+  Col,
+  Typography,
+  List,
+  Avatar,
+  Tag,
   Tabs,
   Select,
   Statistic,
   message
 } from 'antd';
-import { 
-  TrophyOutlined, 
-  FireOutlined, 
+import {
+  TrophyOutlined,
+  FireOutlined,
   ClockCircleOutlined,
   UserOutlined,
   BarChartOutlined
@@ -193,6 +193,45 @@ const Stats: React.FC = () => {
     }));
   };
 
+  // 生成学习习惯分析报告
+  const renderPersonalHabitReport = () => {
+    if (!personalStats) return null;
+    const { studyStats, dailyStats, subjectStats, user } = personalStats;
+    if (!studyStats) return null;
+
+    // 连续打卡天数
+    const streak = user.streak || 0;
+    // 总打卡天数
+    const totalCheckins = studyStats.totalCheckins || 0;
+    // 平均学习时长
+    const avgTime = Math.round(studyStats.avgStudyTime || 0);
+    // 最常学习科目
+    let topSubject = '';
+    if (subjectStats && subjectStats.length > 0) {
+      topSubject = subjectStats[0]._id;
+    }
+    // 近一段时间最高学习天数
+    let maxDay = '';
+    let maxCheckins = 0;
+    if (dailyStats && dailyStats.length > 0) {
+      const max = dailyStats.reduce((a, b) => (a.checkins > b.checkins ? a : b));
+      maxDay = `${max._id.month}月${max._id.day}日`;
+      maxCheckins = max.checkins;
+    }
+
+    return (
+      <Card style={{ marginBottom: 24 }}>
+        <Text strong>学习习惯分析：</Text>
+        <div style={{ marginTop: 8 }}>
+          <div>· 你在本周期内共打卡 <span style={{ color: '#1890ff' }}>{totalCheckins}</span> 天，连续打卡 <span style={{ color: '#fa541c' }}>{streak}</span> 天。</div>
+          <div>· 平均每次学习 <span style={{ color: '#722ed1' }}>{avgTime}</span> 分钟。</div>
+          {topSubject && <div>· 最常学习的科目是 <span style={{ color: '#faad14' }}>{topSubject}</span>。</div>}
+          {maxDay && <div>· {maxDay} 是你打卡最多的一天（<span style={{ color: '#13c2c2' }}>{maxCheckins}</span> 次）。</div>}
+        </div>
+      </Card>
+    );
+  };
+
   const renderPersonalStats = () => {
     if (!personalStats) return null;
 
@@ -201,7 +240,8 @@ const Stats: React.FC = () => {
 
     return (
       <div>
-        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        {renderPersonalHabitReport()}
+  <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
           <Col xs={24} sm={12} lg={6}>
             <Card>
               <Statistic
@@ -323,10 +363,10 @@ const Stats: React.FC = () => {
               renderItem={(item, index) => (
                 <List.Item>
                   <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                    <div style={{ 
-                      width: 32, 
-                      height: 32, 
-                      borderRadius: '50%', 
+                    <div style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: '50%',
                       backgroundColor: index < 3 ? '#1890ff' : '#f0f0f0',
                       color: index < 3 ? 'white' : '#666',
                       display: 'flex',
@@ -337,7 +377,7 @@ const Stats: React.FC = () => {
                     }}>
                       {index + 1}
                     </div>
-                    <Avatar src={item.avatar} style={{ marginRight: 12 }}>{item.username[0]}</Avatar>
+                    <Avatar src={item.avatar} style={{ marginRight: 12 }}>{item.username?.[0] || 'U'}</Avatar>
                     <div style={{ flex: 1 }}>
                       <Text strong>{item.username}</Text>
                       <br />
@@ -362,10 +402,10 @@ const Stats: React.FC = () => {
               renderItem={(item, index) => (
                 <List.Item>
                   <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                    <div style={{ 
-                      width: 32, 
-                      height: 32, 
-                      borderRadius: '50%', 
+                    <div style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: '50%',
                       backgroundColor: index < 3 ? '#f5222d' : '#f0f0f0',
                       color: index < 3 ? 'white' : '#666',
                       display: 'flex',
@@ -376,7 +416,7 @@ const Stats: React.FC = () => {
                     }}>
                       {index + 1}
                     </div>
-                    <Avatar src={item.avatar} style={{ marginRight: 12 }}>{item.username[0]}</Avatar>
+                    <Avatar src={item.avatar} style={{ marginRight: 12 }}>{item.username?.[0] || 'U'}</Avatar>
                     <div style={{ flex: 1 }}>
                       <Text strong>{item.username}</Text>
                       <br />

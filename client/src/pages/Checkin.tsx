@@ -1,28 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Form, 
-  Input, 
-  InputNumber, 
-  Select, 
-  Button, 
-  Card, 
-  Typography, 
-  Row, 
-  Col, 
-  List, 
-  Avatar, 
-  Tag, 
+import {
+  Form,
+  Input,
+  InputNumber,
+  Select,
+  Button,
+  Card,
+  Typography,
+  Row,
+  Col,
+  List,
+  Avatar,
+  Tag,
   message,
   Space,
-  Divider
+  Divider,
+  Modal
 } from 'antd';
-import { 
-  ClockCircleOutlined, 
-  BookOutlined, 
+import {
+  ClockCircleOutlined,
+  BookOutlined,
   SmileOutlined,
-  HeartOutlined,
-  MessageOutlined,
-  LikeOutlined
+  CheckCircleOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
@@ -68,11 +67,14 @@ const Checkin: React.FC = () => {
   const [checkins, setCheckins] = useState<Checkin[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [hasCheckedInToday, setHasCheckedInToday] = useState(false);
+  // 移除“今日已打卡”逻辑，始终允许打卡
+  // const [hasCheckedInToday, setHasCheckedInToday] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [lastCheckinData, setLastCheckinData] = useState<any>(null);
 
   const subjects = [
-    '数学', '英语', '语文', '物理', '化学', '生物', 
-    '历史', '地理', '政治', '计算机', '编程', '设计', 
+    '数学', '英语', '语文', '物理', '化学', '生物',
+    '历史', '地理', '政治', '计算机', '编程', '设计',
     '音乐', '美术', '体育', '其他'
   ];
 
@@ -129,19 +131,19 @@ const Checkin: React.FC = () => {
         }
       ];
 
-      setCheckins(demoCheckins);
-      setHasCheckedInToday(false); // 演示模式显示可以打卡
-      setLoading(false);
+  setCheckins(demoCheckins);
+  setLoading(false);
     } else {
       fetchCheckins();
-      checkTodayCheckin();
+  // 不再检查今日是否已打卡，始终允许打卡
     }
   }, [user]);
 
   const fetchCheckins = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/checkins?limit=20');
+      // 只获取当前用户自己的打卡记录
+      const response = await api.get(`/checkins?userId=${user?.id}&limit=20`);
       setCheckins(response.data.checkins);
     } catch (error) {
       message.error('获取打卡记录失败');
@@ -150,27 +152,29 @@ const Checkin: React.FC = () => {
     }
   };
 
-  const checkTodayCheckin = async () => {
-    try {
-      const today = new Date().toDateString();
-      const todayCheckin = checkins.find(checkin => 
-        new Date(checkin.createdAt).toDateString() === today &&
-        checkin.user._id === user?.id
-      );
-      setHasCheckedInToday(!!todayCheckin);
-    } catch (error) {
-      console.error('检查今日打卡失败:', error);
-    }
-  };
+  // 移除 checkTodayCheckin 逻辑
 
   const onFinish = async (values: any) => {
     setSubmitting(true);
     try {
-      await api.post('/checkins', values);
-      message.success('打卡成功！');
+      const response = await api.post('/checkins', values);
+
+      // 保存打卡数据用于显示
+      setLastCheckinData({
+        ...values,
+        createdAt: new Date().toISOString()
+      });
+
+      // 重置表单
       form.resetFields();
+
+      // 刷新打卡记录
       fetchCheckins();
-      setHasCheckedInToday(true);
+  // 不再设置 hasCheckedInToday，始终允许打卡
+
+      // 显示成功模态框
+      setSuccessModalVisible(true);
+
     } catch (error: any) {
       message.error(error.response?.data?.message || '打卡失败');
     } finally {
@@ -178,14 +182,14 @@ const Checkin: React.FC = () => {
     }
   };
 
-  const handleLike = async (checkinId: string) => {
-    try {
-      await api.post(`/checkins/${checkinId}/like`);
-      fetchCheckins();
-    } catch (error) {
-      message.error('操作失败');
-    }
+  const handleSuccessModalClose = () => {
+    setSuccessModalVisible(false);
+    setLastCheckinData(null);
+    // 关闭模态框后重置表单，允许继续打卡
+    form.resetFields();
   };
+
+
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -197,128 +201,111 @@ const Checkin: React.FC = () => {
     return moods.find(m => m.value === mood) || moods[2];
   };
 
-  const isLiked = (checkin: Checkin) => {
-    return checkin.likes.some(like => like.user._id === user?.id);
-  };
 
   return (
     <div>
       <Title level={2}>学习打卡</Title>
-      
+
       <Row gutter={[24, 24]}>
-        {/* 打卡表单 */}
+        {/* 打卡表单：始终显示 */}
         <Col xs={24} lg={8}>
-          <Card title="今日打卡" className={hasCheckedInToday ? 'completed-card' : ''}>
-            {hasCheckedInToday ? (
-              <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                <div style={{ fontSize: '48px', color: '#52c41a', marginBottom: 16 }}>
-                  ✓
-                </div>
-                <Title level={4} style={{ color: '#52c41a' }}>
-                  今日已打卡
-                </Title>
-                <Text type="secondary">
-                  明天继续加油！
-                </Text>
-              </div>
-            ) : (
-              <Form
-                form={form}
-                layout="vertical"
-                onFinish={onFinish}
-                size="large"
+          <Card title="今日打卡">
+            <Form
+              form={form}
+              layout="vertical"
+              onFinish={onFinish}
+              size="large"
+            >
+              <Form.Item
+                name="content"
+                label="学习内容"
+                rules={[{ required: true, message: '请描述今天的学习内容' }]}
               >
-                <Form.Item
-                  name="content"
-                  label="学习内容"
-                  rules={[{ required: true, message: '请描述今天的学习内容' }]}
-                >
-                  <TextArea
-                    rows={4}
-                    placeholder="今天学习了什么？有什么收获？"
-                    maxLength={500}
-                    showCount
-                  />
-                </Form.Item>
+                <TextArea
+                  rows={4}
+                  placeholder="今天学习了什么？有什么收获？"
+                  maxLength={500}
+                  showCount
+                />
+              </Form.Item>
 
-                <Form.Item
-                  name="studyTime"
-                  label="学习时长"
-                  rules={[{ required: true, message: '请输入学习时长' }]}
-                >
-                  <InputNumber
-                    min={1}
-                    max={1440}
-                    placeholder="分钟"
-                    style={{ width: '100%' }}
-                    addonAfter="分钟"
-                    prefix={<ClockCircleOutlined />}
-                  />
-                </Form.Item>
+              <Form.Item
+                name="studyTime"
+                label="学习时长"
+                rules={[{ required: true, message: '请输入学习时长' }]}
+              >
+                <InputNumber
+                  min={1}
+                  max={1440}
+                  placeholder="分钟"
+                  style={{ width: '100%' }}
+                  addonAfter="分钟"
+                  prefix={<ClockCircleOutlined />}
+                />
+              </Form.Item>
 
-                <Form.Item
-                  name="subject"
-                  label="学习科目"
-                  rules={[{ required: true, message: '请选择学习科目' }]}
-                >
-                  <Select placeholder="选择科目" prefix={<BookOutlined />}>
-                    {subjects.map(subject => (
-                      <Option key={subject} value={subject}>{subject}</Option>
-                    ))}
-                  </Select>
-                </Form.Item>
+              <Form.Item
+                name="subject"
+                label="学习科目"
+                rules={[{ required: true, message: '请选择学习科目' }]}
+              >
+                <Select placeholder="选择科目" prefix={<BookOutlined />}>
+                  {subjects.map(subject => (
+                    <Option key={subject} value={subject}>{subject}</Option>
+                  ))}
+                </Select>
+              </Form.Item>
 
-                <Form.Item
-                  name="mood"
-                  label="学习心情"
-                  initialValue="normal"
-                >
-                  <Select placeholder="选择心情">
-                    {moods.map(mood => (
-                      <Option key={mood.value} value={mood.value}>
-                        <Tag color={mood.color}>{mood.label}</Tag>
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
+              <Form.Item
+                name="mood"
+                label="学习心情"
+                initialValue="normal"
+              >
+                <Select placeholder="选择心情">
+                  {moods.map(mood => (
+                    <Option key={mood.value} value={mood.value}>
+                      <Tag color={mood.color}>{mood.label}</Tag>
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
 
-                <Form.Item
-                  name="location"
-                  label="学习地点"
-                >
-                  <Input placeholder="在哪里学习的？" />
-                </Form.Item>
+              <Form.Item
+                name="location"
+                label="学习地点"
+              >
+                <Input placeholder="在哪里学习的？" />
+              </Form.Item>
 
-                <Form.Item
-                  name="tags"
-                  label="标签"
-                >
-                  <Select
-                    mode="tags"
-                    placeholder="添加标签（可选）"
-                    style={{ width: '100%' }}
-                  />
-                </Form.Item>
+              <Form.Item
+                name="tags"
+                label="标签"
+              >
+                <Select
+                  mode="tags"
+                  placeholder="添加标签（可选）"
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
 
-                <Form.Item>
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    loading={submitting}
-                    block
-                    size="large"
-                  >
-                    完成打卡
-                  </Button>
-                </Form.Item>
-              </Form>
-            )}
+              <Form.Item>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={submitting}
+                  block
+                  size="large"
+                >
+                  完成打卡
+                </Button>
+              </Form.Item>
+            </Form>
           </Card>
         </Col>
 
-        {/* 打卡动态 */}
+        {/* 我的打卡记录 */}
         <Col xs={24} lg={16}>
-          <Card title="学习动态">
+          <Card title="我的打卡记录">
             <List
               dataSource={checkins}
               loading={loading}
@@ -326,15 +313,10 @@ const Checkin: React.FC = () => {
                 <List.Item>
                   <Card size="small" style={{ width: '100%' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar src={item.user.avatar}>{item.user.username[0]}</Avatar>
-                        <div style={{ marginLeft: 12 }}>
-                          <Text strong>{item.user.username}</Text>
-                          <br />
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            {new Date(item.createdAt).toLocaleString()}
-                          </Text>
-                        </div>
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          {new Date(item.createdAt).toLocaleString()}
+                        </Text>
                       </div>
                       <Tag color={getMoodConfig(item.mood).color}>
                         {getMoodConfig(item.mood).label}
@@ -361,23 +343,6 @@ const Checkin: React.FC = () => {
                       </div>
                     )}
 
-                    <Divider style={{ margin: '12px 0' }} />
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Space>
-                        <Button
-                          type="text"
-                          icon={<LikeOutlined />}
-                          onClick={() => handleLike(item._id)}
-                          style={{ color: isLiked(item) ? '#1890ff' : undefined }}
-                        >
-                          {item.likes.length}
-                        </Button>
-                        <Button type="text" icon={<MessageOutlined />}>
-                          {item.comments.length}
-                        </Button>
-                      </Space>
-                    </div>
                   </Card>
                 </List.Item>
               )}
@@ -385,6 +350,75 @@ const Checkin: React.FC = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* 打卡成功模态框 */}
+      <Modal
+        title="打卡成功！"
+        open={successModalVisible}
+        onCancel={handleSuccessModalClose}
+        footer={[
+          <Button key="close" type="primary" onClick={handleSuccessModalClose}>
+            继续打卡
+          </Button>
+        ]}
+        centered
+        width={400}
+      >
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <div style={{ marginBottom: 16 }}>
+            <CheckCircleOutlined style={{ fontSize: 48, color: '#52c41a' }} />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <Text style={{ fontSize: 16, color: '#52c41a' }}>
+              🎉 恭喜您完成学习打卡！
+            </Text>
+          </div>
+
+          {lastCheckinData && (
+            <div style={{
+              background: '#f6ffed',
+              border: '1px solid #b7eb8f',
+              borderRadius: 8,
+              padding: 16,
+              marginBottom: 16
+            }}>
+              <div style={{ marginBottom: 8 }}>
+                <Text strong>学习科目：</Text>
+                <Tag color="blue" style={{ marginLeft: 8 }}>{lastCheckinData.subject}</Tag>
+              </div>
+
+              <div style={{ marginBottom: 8 }}>
+                <Text strong>学习时长：</Text>
+                <Text style={{ color: '#1890ff', marginLeft: 8 }}>
+                  {formatTime(lastCheckinData.studyTime)}
+                </Text>
+              </div>
+
+              <div style={{ marginBottom: 8 }}>
+                <Text strong>学习心情：</Text>
+                <Tag
+                  color={getMoodConfig(lastCheckinData.mood).color}
+                  style={{ marginLeft: 8 }}
+                >
+                  {getMoodConfig(lastCheckinData.mood).label}
+                </Tag>
+              </div>
+
+              {lastCheckinData.content && (
+                <div>
+                  <Text strong>学习内容：</Text>
+                  <Text style={{ marginLeft: 8 }}>{lastCheckinData.content}</Text>
+                </div>
+              )}
+            </div>
+          )}
+
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            点击"继续打卡"可以立即进行下一次学习打卡
+          </Text>
+        </div>
+      </Modal>
     </div>
   );
 };

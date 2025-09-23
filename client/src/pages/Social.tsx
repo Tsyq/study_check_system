@@ -1,24 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Card, 
-  List, 
-  Avatar, 
-  Button, 
-  Input, 
-  Typography, 
-  Row, 
-  Col, 
-  Tag, 
-  Space, 
+import {
+  Card,
+  List,
+  Avatar,
+  Button,
+  Input,
+  Typography,
+  Row,
+  Col,
+  Tag,
+  Space,
   Tabs,
   message,
   Divider,
   Empty
 } from 'antd';
-import { 
-  SearchOutlined, 
-  UserAddOutlined, 
-  HeartOutlined, 
+import {
+  SearchOutlined,
+  UserAddOutlined,
+  HeartOutlined,
   MessageOutlined,
   ClockCircleOutlined,
   BookOutlined,
@@ -281,9 +281,9 @@ const Social: React.FC = () => {
       <Card size="small" style={{ width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Avatar src={item.user.avatar}>{item.user.username[0]}</Avatar>
+            <Avatar src={item.user?.avatar}>{item.user?.username?.[0] || 'U'}</Avatar>
             <div style={{ marginLeft: 12 }}>
-              <Text strong>{item.user.username}</Text>
+              <Text strong>{item.user?.username || '未知用户'}</Text>
               <br />
               <Text type="secondary" style={{ fontSize: 12 }}>
                 {new Date(item.createdAt).toLocaleString()}
@@ -332,7 +332,7 @@ const Social: React.FC = () => {
       <Card size="small" style={{ width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Avatar src={item.avatar} size="large">{item.username[0]}</Avatar>
+            <Avatar src={item.avatar} size="large">{item.username?.[0] || 'U'}</Avatar>
             <div style={{ marginLeft: 16 }}>
               <Text strong style={{ fontSize: 16 }}>{item.username}</Text>
               <br />
@@ -347,8 +347,8 @@ const Social: React.FC = () => {
               </Space>
             </div>
           </div>
-          <Button 
-            type="primary" 
+          <Button
+            type="primary"
             icon={<UserAddOutlined />}
             onClick={() => handleFollow(item._id)}
           >
@@ -362,7 +362,7 @@ const Social: React.FC = () => {
   return (
     <div>
       <Title level={2}>学习圈</Title>
-      
+
       <Tabs activeKey={activeTab} onChange={setActiveTab}>
         <TabPane tab="关注动态" key="feed">
           <Card>
@@ -374,7 +374,7 @@ const Social: React.FC = () => {
             />
           </Card>
         </TabPane>
-        
+
         <TabPane tab="发现" key="discover">
           <Card>
             <List
@@ -384,7 +384,7 @@ const Social: React.FC = () => {
             />
           </Card>
         </TabPane>
-        
+
         <TabPane tab="用户" key="users">
           <Card>
             <div style={{ marginBottom: 16 }}>
