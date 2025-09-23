@@ -166,13 +166,22 @@ const Checkin: React.FC = () => {
   const onFinish = async (values: any) => {
     setSubmitting(true);
     try {
+      console.log('提交的打卡数据:', values);
       await api.post('/checkins', values);
       message.success('打卡成功！');
       form.resetFields();
       fetchCheckins();
       setHasCheckedInToday(true);
     } catch (error: any) {
-      message.error(error.response?.data?.message || '打卡失败');
+      console.error('打卡失败:', error);
+      console.error('错误响应:', error.response?.data);
+      if (error.response?.status === 401) {
+        message.error('登录已过期，请重新登录');
+      } else if (error.response?.status === 400) {
+        message.error(error.response?.data?.message || '打卡失败');
+      } else {
+        message.error('网络错误，请稍后重试');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -327,9 +336,9 @@ const Checkin: React.FC = () => {
                   <Card size="small" style={{ width: '100%' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                       <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar src={item.user.avatar}>{item.user.username[0]}</Avatar>
+                        <Avatar src={item.user?.avatar}>{item.user?.username?.[0] || 'U'}</Avatar>
                         <div style={{ marginLeft: 12 }}>
-                          <Text strong>{item.user.username}</Text>
+                          <Text strong>{item.user?.username || '未知用户'}</Text>
                           <br />
                           <Text type="secondary" style={{ fontSize: 12 }}>
                             {new Date(item.createdAt).toLocaleString()}
