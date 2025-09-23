@@ -3,8 +3,8 @@ require('dotenv').config();
 module.exports = {
   development: {
     username: process.env.DB_USERNAME || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'smart-study-checkin',
+    password: process.env.DB_PASSWORD || '123456',
+    database: process.env.DB_NAME || 'smart_study_checkin',
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 3306,
     dialect: 'mysql',
@@ -18,8 +18,8 @@ module.exports = {
   },
   test: {
     username: process.env.DB_USERNAME || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME_TEST || 'smart-study-checkin_test',
+    password: process.env.DB_PASSWORD || '123456',
+    database: process.env.DB_NAME_TEST || 'smart_study_checkin_test',
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 3306,
     dialect: 'mysql',
