@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Input, Button, Card, Typography, Row, Col, message, Alert } from 'antd';
+import { Form, Input, Button, Card, Typography, Row, Col, Alert } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,7 +12,7 @@ const Login: React.FC = () => {
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
+  const location = useLocation() as { state?: { fromRegister?: boolean } };
 
   useEffect(() => {
     // 检查是否从注册页面跳转过来
