@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const http = require('http');
@@ -44,6 +45,18 @@ app.use('/api/checkins', require('./routes/checkins'));
 app.use('/api/plans', require('./routes/plans'));
 app.use('/api/social', require('./routes/social'));
 app.use('/api/stats', require('./routes/stats'));
+
+// 前端静态资源（生产环境或需要同源访问时）
+const clientBuildPath = path.join(__dirname, '..', 'client', 'build');
+app.use(express.static(clientBuildPath));
+
+// SPA 路由回退：除 /api 前缀外的所有请求都返回 index.html
+app.get(/^\/(?!api).*/, (req, res, next) => {
+  const indexHtml = path.join(clientBuildPath, 'index.html');
+  res.sendFile(indexHtml, (err) => {
+    if (err) next();
+  });
+});
 
 // Socket.IO 连接处理
 io.on('connection', (socket) => {
