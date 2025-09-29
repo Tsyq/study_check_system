@@ -31,7 +31,7 @@ const App: React.FC = () => {
                     <Layout />
                   </ProtectedRoute>
                 }>
-                  <Route index element={<Navigate to="/dashboard" replace />} />
+                  <Route index element={<Navigate to="/login" replace />} />
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="checkin" element={<Checkin />} />
                   <Route path="plans" element={<Plans />} />

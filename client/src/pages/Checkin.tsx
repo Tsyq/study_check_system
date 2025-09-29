@@ -77,7 +77,7 @@ const Checkin: React.FC = () => {
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [lastCheckinData, setLastCheckinData] = useState<any>(null);
   // 日历弹窗状态
-  const [calendarModal, setCalendarModal] = useState<{visible: boolean, date: string, items: Checkin[]}>({visible: false, date: '', items: []});
+  const [calendarModal, setCalendarModal] = useState<{ visible: boolean, date: string, items: Checkin[] }>({ visible: false, date: '', items: [] });
   // 日历数据分组
   const checkinMap: Record<string, Checkin[]> = React.useMemo(() => {
     const map: Record<string, Checkin[]> = {};
@@ -321,11 +321,7 @@ const Checkin: React.FC = () => {
                   name="tags"
                   label="标签"
                 >
-                  <Select
-                    mode="tags"
-                    placeholder="添加标签（可选）"
-                    style={{ width: '100%' }}
-                  />
+                  <Input placeholder="请输入标签，多个标签用逗号分隔" />
                 </Form.Item>
 
                 <Form.Item>
@@ -413,8 +409,8 @@ const Checkin: React.FC = () => {
             )}
           />
         )}
-  </Modal>
-  {/* 打卡成功模态框 */}
+      </Modal>
+      {/* 打卡成功模态框 */}
       <Modal
         title="打卡成功！"
         open={successModalVisible}
