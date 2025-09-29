@@ -241,7 +241,7 @@ const Stats: React.FC = () => {
     return (
       <div>
         {renderPersonalHabitReport()}
-  <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
           <Col xs={24} sm={12} lg={6}>
             <Card>
               <Statistic

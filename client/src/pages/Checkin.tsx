@@ -131,11 +131,11 @@ const Checkin: React.FC = () => {
         }
       ];
 
-  setCheckins(demoCheckins);
-  setLoading(false);
+      setCheckins(demoCheckins);
+      setLoading(false);
     } else {
       fetchCheckins();
-  // 不再检查今日是否已打卡，始终允许打卡
+      // 不再检查今日是否已打卡，始终允许打卡
     }
   }, [user]);
 
@@ -170,7 +170,7 @@ const Checkin: React.FC = () => {
 
       // 刷新打卡记录
       fetchCheckins();
-  // 不再设置 hasCheckedInToday，始终允许打卡
+      // 不再设置 hasCheckedInToday，始终允许打卡
 
       // 显示成功模态框
       setSuccessModalVisible(true);
