@@ -161,7 +161,11 @@ const Dashboard: React.FC = () => {
               renderItem={(item) => (
                 <List.Item>
                   <List.Item.Meta
+<<<<<<< HEAD
                     avatar={<Avatar src={item.user?.avatar || null}>{item.user?.username?.[0] || 'U'}</Avatar>}
+=======
+                    avatar={<Avatar src={item.user?.avatar}>{item.user?.username?.[0] || 'U'}</Avatar>}
+>>>>>>> 2dc6634ff5ec996a7c06a39977366dcacc1dfc43
                     title={
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>{item.user?.username || '未知用户'}</span>

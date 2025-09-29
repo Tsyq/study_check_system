@@ -157,6 +157,7 @@ const Checkin: React.FC = () => {
   const onFinish = async (values: any) => {
     setSubmitting(true);
     try {
+<<<<<<< HEAD
       const response = await api.post('/checkins', values);
 
       // 保存打卡数据用于显示
@@ -166,6 +167,11 @@ const Checkin: React.FC = () => {
       });
 
       // 重置表单
+=======
+      console.log('提交的打卡数据:', values);
+      await api.post('/checkins', values);
+      message.success('打卡成功！');
+>>>>>>> 2dc6634ff5ec996a7c06a39977366dcacc1dfc43
       form.resetFields();
 
       // 刷新打卡记录
@@ -176,7 +182,15 @@ const Checkin: React.FC = () => {
       setSuccessModalVisible(true);
 
     } catch (error: any) {
-      message.error(error.response?.data?.message || '打卡失败');
+      console.error('打卡失败:', error);
+      console.error('错误响应:', error.response?.data);
+      if (error.response?.status === 401) {
+        message.error('登录已过期，请重新登录');
+      } else if (error.response?.status === 400) {
+        message.error(error.response?.data?.message || '打卡失败');
+      } else {
+        message.error('网络错误，请稍后重试');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -313,10 +327,22 @@ const Checkin: React.FC = () => {
                 <List.Item>
                   <Card size="small" style={{ width: '100%' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+<<<<<<< HEAD
                       <div>
                         <Text type="secondary" style={{ fontSize: 12 }}>
                           {new Date(item.createdAt).toLocaleString()}
                         </Text>
+=======
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <Avatar src={item.user?.avatar}>{item.user?.username?.[0] || 'U'}</Avatar>
+                        <div style={{ marginLeft: 12 }}>
+                          <Text strong>{item.user?.username || '未知用户'}</Text>
+                          <br />
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {new Date(item.createdAt).toLocaleString()}
+                          </Text>
+                        </div>
+>>>>>>> 2dc6634ff5ec996a7c06a39977366dcacc1dfc43
                       </div>
                       <Tag color={getMoodConfig(item.mood).color}>
                         {getMoodConfig(item.mood).label}
