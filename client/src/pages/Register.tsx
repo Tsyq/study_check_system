@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, Typography, Row, Col } from 'antd';
+import { Form, Input, Button, Card, Typography, Row, Col, Alert } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,11 +9,14 @@ const { Title, Text } = Typography;
 
 const Register: React.FC = () => {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const onFinish = async (values: { username: string; email: string; password: string; confirmPassword: string }) => {
+    setError(null);
     if (values.password !== values.confirmPassword) {
+      setError('两次输入的密码不一致');
       return;
     }
 
@@ -23,7 +26,11 @@ const Register: React.FC = () => {
       if (success) {
         // 注册成功后跳转到登录页面，并传递状态
         navigate('/login', { state: { fromRegister: true } });
+      } else {
+        setError('该邮箱已被注册或用户名已存在');
       }
+    } catch (e: any) {
+      setError(e?.message || '注册失败');
     } finally {
       setLoading(false);
     }
@@ -43,6 +50,16 @@ const Register: React.FC = () => {
               </Text>
             </div>
 
+            {error && (
+              <Alert
+                message={error}
+                type="error"
+                showIcon
+                style={{ marginBottom: 16 }}
+                closable
+                onClose={() => setError(null)}
+              />
+            )}
             <Form
               name="register"
               onFinish={onFinish}

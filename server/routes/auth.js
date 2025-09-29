@@ -56,23 +56,23 @@ router.post('/register', async (req, res) => {
 // 用户登录
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { username, password } = req.body;
 
     // 验证输入
-    if (!email || !password) {
-      return res.status(400).json({ message: '请填写邮箱和密码' });
+    if (!username || !password) {
+      return res.status(400).json({ message: '请填写用户名和密码' });
     }
 
     // 查找用户
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({ where: { username } });
     if (!user) {
-      return res.status(401).json({ message: '邮箱或密码错误' });
+      return res.status(401).json({ message: '用户名或密码错误' });
     }
 
     // 验证密码
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      return res.status(401).json({ message: '邮箱或密码错误' });
+      return res.status(401).json({ message: '用户名或密码错误' });
     }
 
     // 检查账户状态

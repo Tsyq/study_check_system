@@ -10,6 +10,7 @@ const { Title, Text } = Typography;
 const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation() as { state?: { fromRegister?: boolean } };
@@ -23,13 +24,18 @@ const Login: React.FC = () => {
     }
   }, [location.state]);
 
-  const onFinish = async (values: { email: string; password: string }) => {
+  const onFinish = async (values: { username: string; password: string }) => {
     setLoading(true);
+    setError(null);
     try {
-      const success = await login(values.email, values.password);
+      const success = await login(values.username, values.password);
       if (success) {
         navigate('/dashboard');
+      } else {
+        setError('用户名或密码错误，或用户不存在');
       }
+    } catch (e: any) {
+      setError(e?.message || '登录失败');
     } finally {
       setLoading(false);
     }
@@ -49,6 +55,7 @@ const Login: React.FC = () => {
               </Text>
             </div>
 
+
             {showSuccessMessage && (
               <Alert
                 message="注册成功！"
@@ -60,6 +67,16 @@ const Login: React.FC = () => {
                 onClose={() => setShowSuccessMessage(false)}
               />
             )}
+            {error && (
+              <Alert
+                message={error}
+                type="error"
+                showIcon
+                style={{ marginBottom: 16 }}
+                closable
+                onClose={() => setError(null)}
+              />
+            )}
 
             <Form
               name="login"
@@ -68,15 +85,15 @@ const Login: React.FC = () => {
               size="large"
             >
               <Form.Item
-                name="email"
+                name="username"
                 rules={[
-                  { required: true, message: '请输入邮箱地址' },
-                  { type: 'email', message: '请输入有效的邮箱地址' }
+                  { required: true, message: '请输入用户名' },
+                  { min: 3, message: '用户名至少3个字符' }
                 ]}
               >
                 <Input
                   prefix={<UserOutlined />}
-                  placeholder="邮箱地址"
+                  placeholder="用户名"
                 />
               </Form.Item>
 

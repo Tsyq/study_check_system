@@ -15,8 +15,13 @@ import {
   message,
   Space,
   Divider,
-  Modal
+  Modal,
+  Calendar,
+  Badge
 } from 'antd';
+import dayjs from 'dayjs';
+import 'dayjs/locale/zh-cn';
+import locale from 'antd/es/date-picker/locale/zh_CN';
 import {
   ClockCircleOutlined,
   BookOutlined,
@@ -62,15 +67,49 @@ interface Checkin {
 }
 
 const Checkin: React.FC = () => {
+  // 设置 dayjs 全局为中文
+  dayjs.locale('zh-cn');
   const { user } = useAuth();
   const [form] = Form.useForm();
   const [checkins, setCheckins] = useState<Checkin[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  // 移除“今日已打卡”逻辑，始终允许打卡
-  // const [hasCheckedInToday, setHasCheckedInToday] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [lastCheckinData, setLastCheckinData] = useState<any>(null);
+  // 日历弹窗状态
+  const [calendarModal, setCalendarModal] = useState<{visible: boolean, date: string, items: Checkin[]}>({visible: false, date: '', items: []});
+  // 日历数据分组
+  const checkinMap: Record<string, Checkin[]> = React.useMemo(() => {
+    const map: Record<string, Checkin[]> = {};
+    checkins.forEach((item: Checkin) => {
+      const date = dayjs(item.createdAt).format('YYYY-MM-DD');
+      if (!map[date]) map[date] = [];
+      map[date].push(item);
+    });
+    return map;
+  }, [checkins]);
+
+  // 日历单元格渲染
+  const dateCellRender = (value: any) => {
+    const dateStr = value.format('YYYY-MM-DD');
+    const items = checkinMap[dateStr] || [];
+    return (
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {items.length > 0 && (
+          <li>
+            <Badge status="success" text={`打卡${items.length}次`} />
+          </li>
+        )}
+      </ul>
+    );
+  };
+
+  // 日历点击事件
+  const onSelectDate = (value: any) => {
+    const dateStr = value.format('YYYY-MM-DD');
+    const items = checkinMap[dateStr] || [];
+    setCalendarModal({ visible: true, date: dateStr, items });
+  };
 
   const subjects = [
     '数学', '英语', '语文', '物理', '化学', '生物',
@@ -206,152 +245,176 @@ const Checkin: React.FC = () => {
     <div>
       <Title level={2}>学习打卡</Title>
 
-      <Row gutter={[24, 24]}>
-        {/* 打卡表单：始终显示 */}
-        <Col xs={24} lg={8}>
-          <Card title="今日打卡">
-            <Form
-              form={form}
-              layout="vertical"
-              onFinish={onFinish}
-              size="large"
-            >
-              <Form.Item
-                name="content"
-                label="学习内容"
-                rules={[{ required: true, message: '请描述今天的学习内容' }]}
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #e0e7ff 0%, #f0fdfa 100%)', padding: '40px 0' }}>
+        <Row gutter={[32, 32]} justify="center">
+          {/* 左侧：新增打卡表单 */}
+          <Col xs={24} lg={8}>
+            <Card title="今日打卡" bordered={false} style={{ borderRadius: 16, boxShadow: '0 4px 24px #bdbdbd30', background: '#fff' }}>
+              <Form
+                form={form}
+                layout="vertical"
+                onFinish={onFinish}
+                size="large"
               >
-                <TextArea
-                  rows={4}
-                  placeholder="今天学习了什么？有什么收获？"
-                  maxLength={500}
-                  showCount
-                />
-              </Form.Item>
-
-              <Form.Item
-                name="studyTime"
-                label="学习时长"
-                rules={[{ required: true, message: '请输入学习时长' }]}
-              >
-                <InputNumber
-                  min={1}
-                  max={1440}
-                  placeholder="分钟"
-                  style={{ width: '100%' }}
-                  addonAfter="分钟"
-                  prefix={<ClockCircleOutlined />}
-                />
-              </Form.Item>
-
-              <Form.Item
-                name="subject"
-                label="学习科目"
-                rules={[{ required: true, message: '请选择学习科目' }]}
-              >
-                <Select placeholder="选择科目" prefix={<BookOutlined />}>
-                  {subjects.map(subject => (
-                    <Option key={subject} value={subject}>{subject}</Option>
-                  ))}
-                </Select>
-              </Form.Item>
-
-              <Form.Item
-                name="mood"
-                label="学习心情"
-                initialValue="normal"
-              >
-                <Select placeholder="选择心情">
-                  {moods.map(mood => (
-                    <Option key={mood.value} value={mood.value}>
-                      <Tag color={mood.color}>{mood.label}</Tag>
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-
-              <Form.Item
-                name="location"
-                label="学习地点"
-              >
-                <Input placeholder="在哪里学习的？" />
-              </Form.Item>
-
-              <Form.Item
-                name="tags"
-                label="标签"
-              >
-                <Select
-                  mode="tags"
-                  placeholder="添加标签（可选）"
-                  style={{ width: '100%' }}
-                />
-              </Form.Item>
-
-              <Form.Item>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={submitting}
-                  block
-                  size="large"
+                <Form.Item
+                  name="content"
+                  label="学习内容"
+                  rules={[{ required: true, message: '请描述今天的学习内容' }]}
                 >
-                  完成打卡
-                </Button>
-              </Form.Item>
-            </Form>
-          </Card>
-        </Col>
+                  <TextArea
+                    rows={4}
+                    placeholder="今天学习了什么？有什么收获？"
+                    maxLength={500}
+                    showCount
+                  />
+                </Form.Item>
 
-        {/* 我的打卡记录 */}
-        <Col xs={24} lg={16}>
-          <Card title="我的打卡记录">
-            <List
-              dataSource={checkins}
-              loading={loading}
-              renderItem={(item) => (
-                <List.Item>
-                  <Card size="small" style={{ width: '100%' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                      <div>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          {new Date(item.createdAt).toLocaleString()}
-                        </Text>
-                      </div>
-                      <Tag color={getMoodConfig(item.mood).color}>
-                        {getMoodConfig(item.mood).label}
-                      </Tag>
+                <Form.Item
+                  name="studyTime"
+                  label="学习时长"
+                  rules={[{ required: true, message: '请输入学习时长' }]}
+                >
+                  <InputNumber
+                    min={1}
+                    max={1440}
+                    placeholder="分钟"
+                    style={{ width: '100%' }}
+                    addonAfter="分钟"
+                    prefix={<ClockCircleOutlined />}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  name="subject"
+                  label="学习科目"
+                  rules={[{ required: true, message: '请选择学习科目' }]}
+                >
+                  <Select placeholder="选择科目" prefix={<BookOutlined />}>
+                    {subjects.map(subject => (
+                      <Option key={subject} value={subject}>{subject}</Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+
+                <Form.Item
+                  name="mood"
+                  label="学习心情"
+                  initialValue="normal"
+                >
+                  <Select placeholder="选择心情">
+                    {moods.map(mood => (
+                      <Option key={mood.value} value={mood.value}>
+                        <Tag color={mood.color}>{mood.label}</Tag>
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+
+                <Form.Item
+                  name="location"
+                  label="学习地点"
+                >
+                  <Input placeholder="在哪里学习的？" />
+                </Form.Item>
+
+                <Form.Item
+                  name="tags"
+                  label="标签"
+                >
+                  <Select
+                    mode="tags"
+                    placeholder="添加标签（可选）"
+                    style={{ width: '100%' }}
+                  />
+                </Form.Item>
+
+                <Form.Item>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={submitting}
+                    block
+                    size="large"
+                    style={{ background: 'linear-gradient(90deg, #6366f1 0%, #06b6d4 100%)', border: 'none' }}
+                  >
+                    完成打卡
+                  </Button>
+                </Form.Item>
+              </Form>
+            </Card>
+          </Col>
+
+          {/* 右侧：打卡日历 */}
+          <Col xs={24} lg={12}>
+            <Card title="我的打卡日历" bordered={false} style={{ borderRadius: 16, boxShadow: '0 4px 24px #bdbdbd30', background: '#f8fafc' }}>
+              <Calendar
+                dateCellRender={dateCellRender}
+                // 只在点击具体日期时弹窗
+                onSelect={(date, info) => {
+                  // 只在点击天视图时弹窗，切换月/年不弹窗
+                  if (info && info.source === 'date') {
+                    onSelectDate(date);
+                  }
+                }}
+                locale={locale}
+                style={{ background: '#f8fafc', borderRadius: 12, padding: 12 }}
+                headerRender={headerProps => {
+                  const { value, onChange } = headerProps;
+                  const year = value.year();
+                  const month = value.month() + 1;
+                  return (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16, padding: 8 }}>
+                      <Button size="small" onClick={() => onChange(value.clone().subtract(1, 'month'))}>{'<'}</Button>
+                      <span style={{ fontWeight: 600, fontSize: 18, color: '#6366f1' }}>{year}年{month}月</span>
+                      <Button size="small" onClick={() => onChange(value.clone().add(1, 'month'))}>{'>'}</Button>
                     </div>
-
-                    <Text style={{ display: 'block', marginBottom: 12 }}>
-                      {item.content}
-                    </Text>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <Space>
-                        <Tag icon={<BookOutlined />}>{item.subject}</Tag>
-                        <Tag icon={<ClockCircleOutlined />}>{formatTime(item.studyTime)}</Tag>
-                        {item.location && <Tag>{item.location}</Tag>}
-                      </Space>
+                  );
+                }}
+              />
+            </Card>
+          </Col>
+        </Row>
+      </div>
+      {/* 日历弹窗，显示当天所有打卡详情 */}
+      <Modal
+        title={calendarModal.date + ' 打卡详情'}
+        open={calendarModal.visible}
+        onCancel={() => setCalendarModal({ ...calendarModal, visible: false })}
+        footer={null}
+        width={500}
+      >
+        {calendarModal.items.length === 0 ? (
+          <Text type="secondary">这一天没有打卡记录</Text>
+        ) : (
+          <List
+            dataSource={calendarModal.items}
+            renderItem={(item: Checkin) => (
+              <List.Item>
+                <Card size="small" style={{ width: '100%' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>{new Date(item.createdAt).toLocaleTimeString()}</Text>
+                    <Tag color={getMoodConfig(item.mood).color}>{getMoodConfig(item.mood).label}</Tag>
+                  </div>
+                  <Text style={{ display: 'block', marginBottom: 8 }}>{item.content}</Text>
+                  <Space>
+                    <Tag icon={<BookOutlined />}>{item.subject}</Tag>
+                    <Tag icon={<ClockCircleOutlined />}>{formatTime(item.studyTime)}</Tag>
+                    {item.location && <Tag>{item.location}</Tag>}
+                  </Space>
+                  {item.tags && item.tags.length > 0 && (
+                    <div style={{ marginTop: 8 }}>
+                      {item.tags.map(tag => (
+                        <Tag key={tag} color="blue">{tag}</Tag>
+                      ))}
                     </div>
-
-                    {item.tags && item.tags.length > 0 && (
-                      <div style={{ marginBottom: 12 }}>
-                        {item.tags.map(tag => (
-                          <Tag key={tag} color="blue">{tag}</Tag>
-                        ))}
-                      </div>
-                    )}
-
-                  </Card>
-                </List.Item>
-              )}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      {/* 打卡成功模态框 */}
+                  )}
+                </Card>
+              </List.Item>
+            )}
+          />
+        )}
+  </Modal>
+  {/* 打卡成功模态框 */}
       <Modal
         title="打卡成功！"
         open={successModalVisible}
