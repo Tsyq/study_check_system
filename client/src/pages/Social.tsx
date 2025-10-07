@@ -61,15 +61,8 @@ interface Checkin {
   }>;
 }
 
-interface User {
+interface UserBrief {
   _id: string;
-  username: string;
-  avatar: string;
-  bio: string;
-  totalStudyTime: number;
-  streak: number;
-  followers: number;
-  following: number;
 }
 
 const Social: React.FC = () => {
@@ -77,9 +70,16 @@ const Social: React.FC = () => {
   const [activeTab, setActiveTab] = useState('feed');
   const [feedCheckins, setFeedCheckins] = useState<Checkin[]>([]);
   const [allCheckins, setAllCheckins] = useState<Checkin[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const [myFollowing, setMyFollowing] = useState<any[]>([]);
+  const [myFollowers, setMyFollowers] = useState<any[]>([]);
+  const [receivedItems, setReceivedItems] = useState<any[]>([]);
+  const [discoverUsers, setDiscoverUsers] = useState<any[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState<Record<string, string>>({});
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (user?.id === 'demo-user') {
@@ -120,50 +120,18 @@ const Social: React.FC = () => {
         }
       ];
 
-      const demoUsers: User[] = [
-        {
-          _id: 'user1',
-          username: '小明',
-          avatar: '',
-          bio: '热爱编程的大学生',
-          totalStudyTime: 2100,
-          streak: 12,
-          followers: 25,
-          following: 15
-        },
-        {
-          _id: 'user2',
-          username: '小红',
-          avatar: '',
-          bio: '英语专业，喜欢阅读',
-          totalStudyTime: 1800,
-          streak: 8,
-          followers: 18,
-          following: 12
-        },
-        {
-          _id: 'user3',
-          username: '小李',
-          avatar: '',
-          bio: '数学爱好者',
-          totalStudyTime: 1500,
-          streak: 5,
-          followers: 10,
-          following: 8
-        }
-      ];
-
       setFeedCheckins(demoCheckins);
       setAllCheckins(demoCheckins);
-      setUsers(demoUsers);
       setLoading(false);
     } else {
+      // 同步关注ID集合
+      fetchFollowingIds();
       if (activeTab === 'feed') {
         fetchFeed();
       } else if (activeTab === 'discover') {
         fetchAllCheckins();
-      } else if (activeTab === 'users') {
-        fetchUsers();
+      } else if (activeTab === 'me') {
+        fetchMine();
       }
     }
   }, [activeTab, user]);
@@ -183,7 +151,8 @@ const Social: React.FC = () => {
   const fetchAllCheckins = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/checkins?limit=20');
+      const url = selectedUserId ? `/checkins?limit=20&userId=${selectedUserId}` : '/checkins?limit=20';
+      const response = await api.get(url);
       setAllCheckins(response.data.checkins);
     } catch (error) {
       message.error('获取打卡动态失败');
@@ -192,42 +161,93 @@ const Social: React.FC = () => {
     }
   };
 
-  const fetchUsers = async () => {
+  const fetchFollowingIds = async () => {
+    if (!user?.id) return;
     setLoading(true);
     try {
-      const response = await api.get('/social/search/users?limit=20');
-      setUsers(response.data.users);
+      const response = await api.get(`/social/following/${user.id}?limit=200`);
+      const raw = (response.data.following || []) as any[];
+      const list = raw.map((u: any) => ({
+        _id: u._id ?? u.id,
+        username: u.username,
+        avatar: u.avatar,
+        bio: u.bio,
+        totalStudyTime: u.totalStudyTime ?? u.total_study_time,
+        streak: u.streak
+      }));
+      setFollowingIds(new Set(list.map(u => u._id)));
+      setMyFollowing(list);
     } catch (error) {
-      message.error('获取用户列表失败');
+      message.error('获取关注用户失败');
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchFollowers = async () => {
+    if (!user?.id) return;
+    try {
+      const response = await api.get(`/social/followers/${user.id}?limit=200`);
+      setMyFollowers(response.data.followers || []);
+    } catch (e) {
+      message.error('获取粉丝失败');
+    }
+  };
+
+  const fetchReceived = async () => {
+    try {
+      const response = await api.get(`/social/me/received?limit=50`);
+      setReceivedItems(response.data.items || []);
+    } catch (e) {
+      message.error('获取收到的互动失败');
+    }
+  };
+
+  const fetchMine = async () => {
+    await Promise.all([fetchFollowingIds(), fetchFollowers(), fetchReceived()]);
+  };
+
   const handleSearch = async (value: string) => {
+    setSearchQuery(value);
     if (!value.trim()) {
-      fetchUsers();
+      setDiscoverUsers([]);
       return;
     }
-
-    setLoading(true);
     try {
-      const response = await api.get(`/social/search/users?q=${encodeURIComponent(value)}`);
-      setUsers(response.data.users);
-    } catch (error) {
+      const res = await api.get(`/social/search/users?q=${encodeURIComponent(value)}&limit=20`);
+      setDiscoverUsers(res.data.users || []);
+    } catch (e) {
       message.error('搜索用户失败');
-    } finally {
-      setLoading(false);
     }
+  };
+
+  const handleClickUsername = async (uid?: string) => {
+    if (!uid) return;
+    setSelectedUserId(uid);
+    await fetchAllCheckins();
   };
 
   const handleFollow = async (userId: string) => {
     try {
       await api.post(`/social/follow/${userId}`);
       message.success('关注成功');
-      fetchUsers();
+      await fetchFollowingIds();
+      if (activeTab === 'feed') fetchFeed();
+      if (activeTab === 'discover') fetchAllCheckins();
     } catch (error: any) {
       message.error(error.response?.data?.message || '关注失败');
+    }
+  };
+
+  const handleUnfollow = async (userId: string) => {
+    try {
+      await api.delete(`/social/follow/${userId}`);
+      message.success('已取消关注');
+      await fetchFollowingIds();
+      if (activeTab === 'feed') fetchFeed();
+      if (activeTab === 'discover') fetchAllCheckins();
+    } catch (error: any) {
+      message.error(error.response?.data?.message || '取关失败');
     }
   };
 
@@ -242,6 +262,30 @@ const Social: React.FC = () => {
     } catch (error) {
       message.error('操作失败');
     }
+  };
+
+  const handleAddComment = async (checkinId: string) => {
+    const text = (commentText[checkinId] || '').trim();
+    if (!text) return message.warning('请输入评论内容');
+    try {
+      await api.post(`/checkins/${checkinId}/comments`, { content: text });
+      setCommentText(prev => ({ ...prev, [checkinId]: '' }));
+      if (activeTab === 'feed') {
+        fetchFeed();
+      } else {
+        fetchAllCheckins();
+      }
+    } catch (e) {
+      message.error('评论失败');
+    }
+  };
+
+  const toggleComments = (checkinId: string) => {
+    setExpandedComments(prev => {
+      const next = new Set(prev);
+      if (next.has(checkinId)) next.delete(checkinId); else next.add(checkinId);
+      return next;
+    });
   };
 
   const formatTime = (minutes: number) => {
@@ -283,7 +327,21 @@ const Social: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <Avatar src={item.user?.avatar || undefined}>{item.user?.username?.[0] || 'U'}</Avatar>
             <div style={{ marginLeft: 12 }}>
-              <Text strong>{item.user?.username || '未知用户'}</Text>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Button type="link" size="small" onClick={() => handleClickUsername(item.user?._id)} style={{ paddingLeft: 0 }}>
+                  <Text strong>{item.user?.username || '未知用户'}</Text>
+                </Button>
+                {item.user?._id && item.user._id !== user?.id && (
+                  followingIds.has(item.user._id) ? (
+                    <Space size="small">
+                      <Tag color="blue">已关注</Tag>
+                      <Button type="link" size="small" onClick={() => handleUnfollow(item.user!._id)}>取关</Button>
+                    </Space>
+                  ) : (
+                    <Button type="link" size="small" onClick={() => handleFollow(item.user!._id)}>关注</Button>
+                  )
+                )}
+              </div>
               <br />
               <Text type="secondary" style={{ fontSize: 12 }}>
                 {new Date(item.createdAt).toLocaleString()}
@@ -318,46 +376,55 @@ const Social: React.FC = () => {
             >
               {item.likes.length}
             </Button>
-            <Button type="text" icon={<MessageOutlined />}>
+            <Button
+              type="text"
+              icon={<MessageOutlined />}
+              onClick={() => toggleComments(item._id)}
+              style={{ color: expandedComments.has(item._id) ? '#1890ff' : undefined }}
+            >
               {item.comments.length}
             </Button>
           </Space>
+          <Space>
+            <Input
+              placeholder="写下你的评论..."
+              size="small"
+              style={{ width: 240 }}
+              value={commentText[item._id] || ''}
+              onChange={(e) => setCommentText(prev => ({ ...prev, [item._id]: e.target.value }))}
+            />
+            <Button type="primary" size="small" onClick={() => handleAddComment(item._id)}>评论</Button>
+          </Space>
         </div>
+
+        {item.comments && item.comments.length > 0 && expandedComments.has(item._id) && (
+          <div style={{ marginTop: 8 }}>
+            <List
+              size="small"
+              header={<Text type="secondary">评论</Text>}
+              dataSource={item.comments}
+              renderItem={(cm: any) => (
+                <List.Item>
+                  <Space>
+                    <Avatar size="small">{cm.user?.username?.[0] || 'U'}</Avatar>
+                    <Text strong>{cm.user?.username || '用户'}</Text>
+                    <Text>{cm.content}</Text>
+                    {cm.createdAt && (
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {new Date(cm.createdAt).toLocaleString()}
+                      </Text>
+                    )}
+                  </Space>
+                </List.Item>
+              )}
+            />
+          </div>
+        )}
       </Card>
     </List.Item>
   );
 
-  const renderUserItem = (item: User) => (
-    <List.Item>
-      <Card size="small" style={{ width: '100%' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Avatar src={item.avatar || undefined} size="large">{item.username?.[0] || 'U'}</Avatar>
-            <div style={{ marginLeft: 16 }}>
-              <Text strong style={{ fontSize: 16 }}>{item.username}</Text>
-              <br />
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                {item.bio || '这个人很懒，什么都没有写'}
-              </Text>
-              <br />
-              <Space size="small" style={{ marginTop: 4 }}>
-                <Tag icon={<ClockCircleOutlined />}>{item.totalStudyTime}分钟</Tag>
-                <Tag icon={<FireOutlined />}>{item.streak}天</Tag>
-                <Tag icon={<TrophyOutlined />}>{item.followers}关注者</Tag>
-              </Space>
-            </div>
-          </div>
-          <Button
-            type="primary"
-            icon={<UserAddOutlined />}
-            onClick={() => handleFollow(item._id)}
-          >
-            关注
-          </Button>
-        </div>
-      </Card>
-    </List.Item>
-  );
+  // 用户列表与关注用户列表已移除
 
   return (
     <div>
@@ -377,16 +444,6 @@ const Social: React.FC = () => {
 
         <TabPane tab="发现" key="discover">
           <Card>
-            <List
-              dataSource={allCheckins}
-              loading={loading}
-              renderItem={renderCheckinItem}
-            />
-          </Card>
-        </TabPane>
-
-        <TabPane tab="用户" key="users">
-          <Card>
             <div style={{ marginBottom: 16 }}>
               <Search
                 placeholder="搜索用户..."
@@ -395,13 +452,112 @@ const Social: React.FC = () => {
                 size="large"
                 onSearch={handleSearch}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                value={searchQuery}
               />
             </div>
+            {discoverUsers.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <List
+                  dataSource={discoverUsers}
+                  renderItem={(u: any) => (
+                    <List.Item>
+                      <Space>
+                        <Avatar src={u.avatar || undefined}>{u.username?.[0] || 'U'}</Avatar>
+                        <Button type="link" onClick={() => handleClickUsername(u._id)}>{u.username}</Button>
+                        {String(u._id) !== String(user?.id) && (
+                          followingIds.has(u._id) ? (
+                            <Button size="small" onClick={() => handleUnfollow(u._id)}>取关</Button>
+                          ) : (
+                            <Button type="primary" size="small" onClick={() => handleFollow(u._id)}>关注</Button>
+                          )
+                        )}
+                      </Space>
+                    </List.Item>
+                  )}
+                />
+                <Divider />
+              </div>
+            )}
             <List
-              dataSource={users}
+              dataSource={allCheckins}
               loading={loading}
-              renderItem={renderUserItem}
+              renderItem={renderCheckinItem}
             />
+          </Card>
+        </TabPane>
+
+        <TabPane tab="我的" key="me">
+          <Card>
+            <Row gutter={16}>
+              <Col xs={24} md={12}>
+                <Card size="small" title="已关注">
+                  <List
+                    dataSource={myFollowing}
+                    renderItem={(u: any) => (
+                      <List.Item>
+                        <Space>
+                          <Avatar src={u.avatar || undefined}>{u.username?.[0] || 'U'}</Avatar>
+                          <Button type="link" onClick={() => handleClickUsername(u._id)}>{u.username}</Button>
+                          <Button size="small" onClick={() => handleUnfollow(u._id)}>取关</Button>
+                        </Space>
+                      </List.Item>
+                    )}
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} md={12}>
+                <Card size="small" title="我的粉丝">
+                  <List
+                    dataSource={myFollowers}
+                    renderItem={(u: any) => (
+                      <List.Item>
+                        <Space>
+                          <Avatar src={u.avatar || undefined}>{u.username?.[0] || 'U'}</Avatar>
+                          <Button type="link" onClick={() => handleClickUsername(u._id)}>{u.username}</Button>
+                        </Space>
+                      </List.Item>
+                    )}
+                  />
+                </Card>
+              </Col>
+            </Row>
+
+            <Divider />
+
+            <Card size="small" title="消息">
+              <Tabs defaultActiveKey="likes">
+                <TabPane tab={`收到的赞`} key="likes">
+                  <List
+                    dataSource={receivedItems.filter((it: any) => it.type === 'like')}
+                    locale={{ emptyText: <Empty description="暂无点赞消息" /> }}
+                    renderItem={(it: any) => (
+                      <List.Item>
+                        <Space>
+                          <Avatar>{it.fromUser?.username?.[0] || 'U'}</Avatar>
+                          <Text>{it.fromUser?.username || '用户'} 点赞了你的打卡</Text>
+                          <Text type="secondary">{new Date(it.createdAt).toLocaleString()}</Text>
+                        </Space>
+                      </List.Item>
+                    )}
+                  />
+                </TabPane>
+                <TabPane tab={`回复我的`} key="comments">
+                  <List
+                    dataSource={receivedItems.filter((it: any) => it.type === 'comment')}
+                    locale={{ emptyText: <Empty description="暂无回复" /> }}
+                    renderItem={(it: any) => (
+                      <List.Item>
+                        <Space>
+                          <Avatar>{it.fromUser?.username?.[0] || 'U'}</Avatar>
+                          <Text>{it.fromUser?.username || '用户'} 评论：{it.content || ''}</Text>
+                          <Text type="secondary">{new Date(it.createdAt).toLocaleString()}</Text>
+                        </Space>
+                      </List.Item>
+                    )}
+                  />
+                </TabPane>
+              </Tabs>
+            </Card>
           </Card>
         </TabPane>
       </Tabs>
