@@ -188,7 +188,7 @@ const Profile: React.FC = () => {
                 <div style={{ position: 'relative' }}>
                   <Avatar 
                     size={120} 
-                    src={profile?.avatar} 
+                    src={profile?.avatar || undefined} 
                     icon={<UserOutlined />}
                   />
                   {editing && (

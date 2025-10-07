@@ -377,7 +377,7 @@ const Stats: React.FC = () => {
                     }}>
                       {index + 1}
                     </div>
-                    <Avatar src={item.avatar} style={{ marginRight: 12 }}>{item.username?.[0] || 'U'}</Avatar>
+                    <Avatar src={item.avatar || undefined} style={{ marginRight: 12 }}>{item.username?.[0] || 'U'}</Avatar>
                     <div style={{ flex: 1 }}>
                       <Text strong>{item.username}</Text>
                       <br />
@@ -416,7 +416,7 @@ const Stats: React.FC = () => {
                     }}>
                       {index + 1}
                     </div>
-                    <Avatar src={item.avatar} style={{ marginRight: 12 }}>{item.username?.[0] || 'U'}</Avatar>
+                    <Avatar src={item.avatar || undefined} style={{ marginRight: 12 }}>{item.username?.[0] || 'U'}</Avatar>
                     <div style={{ flex: 1 }}>
                       <Text strong>{item.username}</Text>
                       <br />

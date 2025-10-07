@@ -17,7 +17,7 @@ const mapCheckin = (c) => ({
   likes: c.likes || [],
   comments: c.comments || [],
   isPublic: c.is_public,
-  tags: c.tags || [],
+  tags: Array.isArray(c.tags) ? c.tags : [],
   createdAt: c.createdAt
 });
 
@@ -92,7 +92,17 @@ router.post('/', authenticateToken, async (req, res) => {
     return res.status(201).json({ message: '打卡成功', checkin: mapCheckin(created) });
   } catch (error) {
     console.error('创建打卡错误:', error);
-    res.status(500).json({ message: '服务器错误' });
+    console.error('请求数据:', req.body);
+    
+    // 根据错误类型返回更详细的错误信息
+    if (error.name === 'SequelizeValidationError') {
+      const errorMessages = error.errors.map(err => `${err.path}: ${err.message}`).join(', ');
+      res.status(400).json({ message: `数据验证失败: ${errorMessages}` });
+    } else if (error.name === 'SequelizeForeignKeyConstraintError') {
+      res.status(400).json({ message: '用户不存在或数据关联错误' });
+    } else {
+      res.status(500).json({ message: `服务器错误: ${error.message}` });
+    }
   }
 });
 
@@ -128,7 +138,7 @@ router.get('/', optionalAuth, async (req, res) => {
       likes: c.likes || [],
       comments: c.comments || [],
       isPublic: c.is_public,
-      tags: c.tags || [],
+      tags: Array.isArray(c.tags) ? c.tags : [],
       createdAt: c.createdAt,
       user: c.user ? {
         _id: c.user.id,

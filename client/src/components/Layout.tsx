@@ -126,7 +126,7 @@ const Layout: React.FC = () => {
               arrow
             >
               <div className="user-info">
-                <Avatar src={user?.avatar} icon={<UserOutlined />} />
+                <Avatar src={user?.avatar || undefined} icon={<UserOutlined />} />
                 <span className="username">{user?.username}</span>
               </div>
             </Dropdown>

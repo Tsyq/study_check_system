@@ -281,7 +281,7 @@ const Social: React.FC = () => {
       <Card size="small" style={{ width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Avatar src={item.user?.avatar}>{item.user?.username?.[0] || 'U'}</Avatar>
+            <Avatar src={item.user?.avatar || undefined}>{item.user?.username?.[0] || 'U'}</Avatar>
             <div style={{ marginLeft: 12 }}>
               <Text strong>{item.user?.username || '未知用户'}</Text>
               <br />
@@ -332,7 +332,7 @@ const Social: React.FC = () => {
       <Card size="small" style={{ width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Avatar src={item.avatar} size="large">{item.username?.[0] || 'U'}</Avatar>
+            <Avatar src={item.avatar || undefined} size="large">{item.username?.[0] || 'U'}</Avatar>
             <div style={{ marginLeft: 16 }}>
               <Text strong style={{ fontSize: 16 }}>{item.username}</Text>
               <br />

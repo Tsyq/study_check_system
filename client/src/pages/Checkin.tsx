@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Form,
   Input,
@@ -10,11 +10,9 @@ import {
   Row,
   Col,
   List,
-  Avatar,
   Tag,
   message,
   Space,
-  Divider,
   Modal,
   Calendar,
   Badge
@@ -25,7 +23,6 @@ import locale from 'antd/es/date-picker/locale/zh_CN';
 import {
   ClockCircleOutlined,
   BookOutlined,
-  SmileOutlined,
   CheckCircleOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -35,14 +32,14 @@ const { Title, Text } = Typography;
 const { TextArea } = Input;
 const { Option } = Select;
 
-interface Checkin {
+interface CheckinRecord {
   _id: string;
   content: string;
   studyTime: number;
   subject: string;
   mood: string;
   location: string;
-  tags: string[];
+  tags: string[] | any;
   createdAt: string;
   user: {
     _id: string;
@@ -71,17 +68,17 @@ const Checkin: React.FC = () => {
   dayjs.locale('zh-cn');
   const { user } = useAuth();
   const [form] = Form.useForm();
-  const [checkins, setCheckins] = useState<Checkin[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [checkins, setCheckins] = useState<CheckinRecord[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [lastCheckinData, setLastCheckinData] = useState<any>(null);
+  const [userSubjects, setUserSubjects] = useState<string[]>([]);
   // 日历弹窗状态
-  const [calendarModal, setCalendarModal] = useState<{ visible: boolean, date: string, items: Checkin[] }>({ visible: false, date: '', items: [] });
+  const [calendarModal, setCalendarModal] = useState<{ visible: boolean, date: string, items: CheckinRecord[] }>({ visible: false, date: '', items: [] });
   // 日历数据分组
-  const checkinMap: Record<string, Checkin[]> = React.useMemo(() => {
-    const map: Record<string, Checkin[]> = {};
-    checkins.forEach((item: Checkin) => {
+  const checkinMap: Record<string, CheckinRecord[]> = React.useMemo(() => {
+    const map: Record<string, CheckinRecord[]> = {};
+    checkins.forEach((item: CheckinRecord) => {
       const date = dayjs(item.createdAt).format('YYYY-MM-DD');
       if (!map[date]) map[date] = [];
       map[date].push(item);
@@ -111,10 +108,13 @@ const Checkin: React.FC = () => {
     setCalendarModal({ visible: true, date: dateStr, items });
   };
 
-  const subjects = [
-    '数学', '英语', '语文', '物理', '化学', '生物',
-    '历史', '地理', '政治', '计算机', '编程', '设计',
-    '音乐', '美术', '体育', '其他'
+  const predefinedSubjects = [
+    '高等数学', '线性代数', '概率论与数理统计', '离散数学', '数学分析',
+    'C语言程序设计', 'Java程序设计', 'Python程序设计', 'C++程序设计', '数据结构与算法',
+    '计算机组成原理', '操作系统', '计算机网络', '数据库原理', '软件工程',
+    '人工智能', '机器学习', '深度学习', '计算机图形学', '数字图像处理',
+    '编译原理', '计算机体系结构', '信息安全', '密码学', 'Web开发',
+    '移动应用开发', '数据分析', '算法设计与分析', '计算机视觉', '其他'
   ];
 
   const moods = [
@@ -125,10 +125,32 @@ const Checkin: React.FC = () => {
     { value: 'frustrated', label: '沮丧', color: 'purple' }
   ];
 
+  // 获取用户的学习计划科目
+  const fetchUserPlans = async () => {
+    try {
+      const response = await api.get('/plans');
+      const plans = response.data.plans || [];
+      const subjects = plans.map((plan: any) => plan.subject).filter((subject: string) => subject);
+      setUserSubjects(subjects);
+    } catch (error) {
+      console.error('获取用户学习计划失败:', error);
+    }
+  };
+
+  const fetchCheckins = useCallback(async () => {
+    try {
+      // 只获取当前用户自己的打卡记录
+      const response = await api.get(`/checkins?userId=${user?.id}&limit=20`);
+      setCheckins(response.data.checkins);
+    } catch (error) {
+      message.error('获取打卡记录失败');
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     if (user?.id === 'demo-user') {
       // 演示模式，使用模拟数据
-      const demoCheckins: Checkin[] = [
+      const demoCheckins: CheckinRecord[] = [
         {
           _id: '1',
           content: '今天学习了React Hooks，感觉对状态管理有了更深的理解！',
@@ -171,36 +193,40 @@ const Checkin: React.FC = () => {
       ];
 
       setCheckins(demoCheckins);
-      setLoading(false);
-    } else {
+    } else if (user?.id) {
       fetchCheckins();
+      fetchUserPlans();
       // 不再检查今日是否已打卡，始终允许打卡
     }
-  }, [user]);
-
-  const fetchCheckins = async () => {
-    setLoading(true);
-    try {
-      // 只获取当前用户自己的打卡记录
-      const response = await api.get(`/checkins?userId=${user?.id}&limit=20`);
-      setCheckins(response.data.checkins);
-    } catch (error) {
-      message.error('获取打卡记录失败');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [user, fetchCheckins]);
 
   // 移除 checkTodayCheckin 逻辑
 
   const onFinish = async (values: any) => {
     setSubmitting(true);
     try {
-      const response = await api.post('/checkins', values);
+      console.log('发送打卡数据:', values);
+      
+      // 确保数据类型正确并映射字段名
+      const submitData = {
+        content: values.content?.trim() || '',
+        studyTime: parseInt(values.studyTime) || 0,
+        subject: values.subject?.trim() || '',
+        images: values.images || [],
+        mood: values.mood || 'normal',
+        location: values.location || '',
+        tags: values.tags || [],
+        isPublic: values.isPublic !== undefined ? !!values.isPublic : true
+      };
+      
+      console.log('处理后的打卡数据:', submitData);
+      
+      const response = await api.post('/checkins', submitData);
+      console.log('打卡成功响应:', response.data);
 
       // 保存打卡数据用于显示
       setLastCheckinData({
-        ...values,
+        ...submitData,
         createdAt: new Date().toISOString()
       });
 
@@ -209,13 +235,17 @@ const Checkin: React.FC = () => {
 
       // 刷新打卡记录
       fetchCheckins();
+      // 刷新用户科目列表（以防添加了新科目）
+      fetchUserPlans();
       // 不再设置 hasCheckedInToday，始终允许打卡
 
       // 显示成功模态框
       setSuccessModalVisible(true);
 
     } catch (error: any) {
-      message.error(error.response?.data?.message || '打卡失败');
+      console.error('打卡失败:', error);
+      console.error('错误详情:', error.response?.data);
+      message.error(error.response?.data?.message || '打卡失败，请重试');
     } finally {
       setSubmitting(false);
     }
@@ -272,6 +302,7 @@ const Checkin: React.FC = () => {
                 <Form.Item
                   name="studyTime"
                   label="学习时长"
+                  initialValue={60}
                   rules={[{ required: true, message: '请输入学习时长' }]}
                 >
                   <InputNumber
@@ -289,9 +320,11 @@ const Checkin: React.FC = () => {
                   label="学习科目"
                   rules={[{ required: true, message: '请选择学习科目' }]}
                 >
-                  <Select placeholder="选择科目" prefix={<BookOutlined />}>
-                    {subjects.map(subject => (
-                      <Option key={subject} value={subject}>{subject}</Option>
+                  <Select placeholder="选择学习科目" prefix={<BookOutlined />}>
+                    {predefinedSubjects.map(subject => (
+                      <Option key={subject} value={subject}>
+                        {subject}
+                      </Option>
                     ))}
                   </Select>
                 </Form.Item>
@@ -325,16 +358,18 @@ const Checkin: React.FC = () => {
                 </Form.Item>
 
                 <Form.Item>
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    loading={submitting}
-                    block
-                    size="large"
-                    style={{ background: 'linear-gradient(90deg, #6366f1 0%, #06b6d4 100%)', border: 'none' }}
-                  >
-                    完成打卡
-                  </Button>
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      loading={submitting}
+                      block
+                      size="large"
+                      style={{ background: 'linear-gradient(90deg, #6366f1 0%, #06b6d4 100%)', border: 'none' }}
+                    >
+                      完成打卡
+                    </Button>
+                  </Space>
                 </Form.Item>
               </Form>
             </Card>
@@ -384,7 +419,7 @@ const Checkin: React.FC = () => {
         ) : (
           <List
             dataSource={calendarModal.items}
-            renderItem={(item: Checkin) => (
+            renderItem={(item: CheckinRecord) => (
               <List.Item>
                 <Card size="small" style={{ width: '100%' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
@@ -397,9 +432,9 @@ const Checkin: React.FC = () => {
                     <Tag icon={<ClockCircleOutlined />}>{formatTime(item.studyTime)}</Tag>
                     {item.location && <Tag>{item.location}</Tag>}
                   </Space>
-                  {item.tags && item.tags.length > 0 && (
+                  {item.tags && Array.isArray(item.tags) && item.tags.length > 0 && (
                     <div style={{ marginTop: 8 }}>
-                      {item.tags.map(tag => (
+                      {item.tags.filter(tag => typeof tag === 'string').map((tag: string) => (
                         <Tag key={tag} color="blue">{tag}</Tag>
                       ))}
                     </div>
