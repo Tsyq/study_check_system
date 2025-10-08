@@ -334,7 +334,7 @@ const Social: React.FC = () => {
                 {item.user?._id && item.user._id !== user?.id && (
                   followingIds.has(item.user._id) ? (
                     <Space size="small">
-                      <Tag color="blue">已关注</Tag>
+                      <Tag color="blue">正在关注</Tag>
                       <Button type="link" size="small" onClick={() => handleUnfollow(item.user!._id)}>取关</Button>
                     </Space>
                   ) : (
@@ -466,7 +466,10 @@ const Social: React.FC = () => {
                         <Button type="link" onClick={() => handleClickUsername(u._id)}>{u.username}</Button>
                         {String(u._id) !== String(user?.id) && (
                           followingIds.has(u._id) ? (
-                            <Button size="small" onClick={() => handleUnfollow(u._id)}>取关</Button>
+                            <Space>
+                              <Tag color="blue">正在关注</Tag>
+                              <Button size="small" onClick={() => handleUnfollow(u._id)}>取关</Button>
+                            </Space>
                           ) : (
                             <Button type="primary" size="small" onClick={() => handleFollow(u._id)}>关注</Button>
                           )
@@ -490,7 +493,7 @@ const Social: React.FC = () => {
           <Card>
             <Row gutter={16}>
               <Col xs={24} md={12}>
-                <Card size="small" title="已关注">
+                <Card size="small" title="正在关注">
                   <List
                     dataSource={myFollowing}
                     renderItem={(u: any) => (
@@ -506,7 +509,7 @@ const Social: React.FC = () => {
                 </Card>
               </Col>
               <Col xs={24} md={12}>
-                <Card size="small" title="我的粉丝">
+                <Card size="small" title="关注者">
                   <List
                     dataSource={myFollowers}
                     renderItem={(u: any) => (
