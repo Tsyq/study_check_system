@@ -2,6 +2,7 @@ const sequelize = require('../config/sequelize');
 const User = require('./User');
 const Checkin = require('./Checkin');
 const StudyPlan = require('./StudyPlan');
+const UserFollow = require('./UserFollow');
 
 // 定义关联关系
 User.hasMany(Checkin, { 
@@ -41,5 +42,6 @@ module.exports = {
   sequelize,
   User,
   Checkin,
-  StudyPlan
+  StudyPlan,
+  UserFollow
 };

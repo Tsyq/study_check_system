@@ -66,7 +66,7 @@ interface UserBrief {
 }
 
 const Social: React.FC = () => {
-  const { user } = useAuth() as any;
+  const { user, updateUser } = useAuth() as any;
   const [activeTab, setActiveTab] = useState('feed');
   const [feedCheckins, setFeedCheckins] = useState<Checkin[]>([]);
   const [allCheckins, setAllCheckins] = useState<Checkin[]>([]);
@@ -120,18 +120,61 @@ const Social: React.FC = () => {
         }
       ];
 
+      // 模拟关注和粉丝数据
+      const demoFollowing = [
+        {
+          _id: 'user1',
+          username: '小明',
+          avatar: '',
+          bio: '热爱编程的学习者',
+          totalStudyTime: 1200,
+          streak: 15
+        },
+        {
+          _id: 'user2',
+          username: '小红',
+          avatar: '',
+          bio: '英语学习达人',
+          totalStudyTime: 800,
+          streak: 8
+        }
+      ];
+
+      const demoFollowers = [
+        {
+          _id: 'user3',
+          username: '小李',
+          avatar: '',
+          bio: '数学爱好者',
+          totalStudyTime: 1500,
+          streak: 20
+        },
+        {
+          _id: 'user4',
+          username: '小王',
+          avatar: '',
+          bio: '前端开发者',
+          totalStudyTime: 2000,
+          streak: 25
+        }
+      ];
+
       setFeedCheckins(demoCheckins);
       setAllCheckins(demoCheckins);
+      setMyFollowing(demoFollowing);
+      setMyFollowers(demoFollowers);
+      setFollowingIds(new Set(demoFollowing.map(u => u._id)));
       setLoading(false);
     } else {
-      // 同步关注ID集合
+      // 同步关注ID集合和粉丝数据
       fetchFollowingIds();
+      fetchFollowers();
       if (activeTab === 'feed') {
         fetchFeed();
       } else if (activeTab === 'discover') {
         fetchAllCheckins();
       } else if (activeTab === 'me') {
-        fetchMine();
+        fetchReceived();
       }
     }
   }, [activeTab, user]);
@@ -162,10 +205,15 @@ const Social: React.FC = () => {
   };
 
   const fetchFollowingIds = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('用户未登录，跳过获取关注列表');
+      return;
+    }
     setLoading(true);
     try {
-      const response = await api.get(`/social/following/${user.id}?limit=200`);
+      console.log('开始获取关注列表，用户ID:', user.id);
+      const response = await api.get(`/social/following/${user.id}?limit=200&_t=${Date.now()}`);
+      console.log('关注列表API响应:', response.data);
       const raw = (response.data.following || []) as any[];
       const list = raw.map((u: any) => ({
         _id: u._id ?? u.id,
@@ -178,6 +226,7 @@ const Social: React.FC = () => {
       setFollowingIds(new Set(list.map(u => u._id)));
       setMyFollowing(list);
     } catch (error) {
+      console.error('获取关注用户失败:', error);
       message.error('获取关注用户失败');
     } finally {
       setLoading(false);
@@ -185,11 +234,17 @@ const Social: React.FC = () => {
   };
 
   const fetchFollowers = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('用户未登录，跳过获取粉丝列表');
+      return;
+    }
     try {
-      const response = await api.get(`/social/followers/${user.id}?limit=200`);
+      console.log('开始获取粉丝列表，用户ID:', user.id);
+      const response = await api.get(`/social/followers/${user.id}?limit=200&_t=${Date.now()}`);
+      console.log('粉丝列表API响应:', response.data);
       setMyFollowers(response.data.followers || []);
     } catch (e) {
+      console.error('获取粉丝失败:', e);
       message.error('获取粉丝失败');
     }
   };
@@ -205,6 +260,15 @@ const Social: React.FC = () => {
 
   const fetchMine = async () => {
     await Promise.all([fetchFollowingIds(), fetchFollowers(), fetchReceived()]);
+  };
+
+  const refreshUserInfo = async () => {
+    try {
+      const response = await api.get('/auth/me');
+      updateUser(response.data.user);
+    } catch (error) {
+      console.error('刷新用户信息失败:', error);
+    }
   };
 
   const handleSearch = async (value: string) => {
@@ -231,7 +295,10 @@ const Social: React.FC = () => {
     try {
       await api.post(`/social/follow/${userId}`);
       message.success('关注成功');
-      await fetchFollowingIds();
+      await Promise.all([
+        fetchFollowingIds(),
+        refreshUserInfo() // 刷新用户信息以更新关注数量
+      ]);
       if (activeTab === 'feed') fetchFeed();
       if (activeTab === 'discover') fetchAllCheckins();
     } catch (error: any) {
@@ -243,7 +310,10 @@ const Social: React.FC = () => {
     try {
       await api.delete(`/social/follow/${userId}`);
       message.success('已取消关注');
-      await fetchFollowingIds();
+      await Promise.all([
+        fetchFollowingIds(),
+        refreshUserInfo() // 刷新用户信息以更新关注数量
+      ]);
       if (activeTab === 'feed') fetchFeed();
       if (activeTab === 'discover') fetchAllCheckins();
     } catch (error: any) {
@@ -333,12 +403,16 @@ const Social: React.FC = () => {
                 </Button>
                 {item.user?._id && item.user._id !== user?.id && (
                   followingIds.has(item.user._id) ? (
-                    <Space size="small">
-                      <Tag color="blue">正在关注</Tag>
-                      <Button type="link" size="small" onClick={() => handleUnfollow(item.user!._id)}>取关</Button>
-                    </Space>
+                    <Button 
+                      type="primary" 
+                      size="small" 
+                      onClick={() => handleUnfollow(item.user!._id)}
+                      style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+                    >
+                      已关注
+                    </Button>
                   ) : (
-                    <Button type="link" size="small" onClick={() => handleFollow(item.user!._id)}>关注</Button>
+                    <Button type="primary" size="small" onClick={() => handleFollow(item.user!._id)}>关注</Button>
                   )
                 )}
               </div>
@@ -466,10 +540,14 @@ const Social: React.FC = () => {
                         <Button type="link" onClick={() => handleClickUsername(u._id)}>{u.username}</Button>
                         {String(u._id) !== String(user?.id) && (
                           followingIds.has(u._id) ? (
-                            <Space>
-                              <Tag color="blue">正在关注</Tag>
-                              <Button size="small" onClick={() => handleUnfollow(u._id)}>取关</Button>
-                            </Space>
+                            <Button 
+                              type="primary" 
+                              size="small" 
+                              onClick={() => handleUnfollow(u._id)}
+                              style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+                            >
+                              已关注
+                            </Button>
                           ) : (
                             <Button type="primary" size="small" onClick={() => handleFollow(u._id)}>关注</Button>
                           )

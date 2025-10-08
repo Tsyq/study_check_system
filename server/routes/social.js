@@ -71,19 +71,20 @@ router.get('/following/:userId', optionalAuth, async (req, res) => {
 
     const where = q ? { username: { [Op.like]: `%${q}%` } } : undefined;
 
-    const { rows, count } = await User.findAndCountAll({
-      include: [{
-        model: User,
-        as: 'followers',
-        where: { id: user.id }
-      }],
+    // 使用更简单的查询方式
+    const following = await user.getFollowing({
       where,
       attributes: ['id', 'username', 'avatar', 'bio', 'total_study_time', 'streak'],
       offset,
       limit: parseInt(limit)
     });
+    
+    const totalCount = await user.countFollowing();
+    
+    const rows = following;
+    const count = totalCount;
 
-    const following = rows.map(u => ({
+    const followingList = rows.map(u => ({
       _id: u.id,
       username: u.username,
       avatar: u.avatar,
@@ -93,7 +94,7 @@ router.get('/following/:userId', optionalAuth, async (req, res) => {
     }));
 
     return res.json({
-      following,
+      following: followingList,
       pagination: {
         current: parseInt(page),
         pages: Math.ceil(count / parseInt(limit)),
@@ -119,18 +120,19 @@ router.get('/followers/:userId', optionalAuth, async (req, res) => {
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const { rows, count } = await User.findAndCountAll({
-      include: [{
-        model: User,
-        as: 'following',
-        where: { id: target.id }
-      }],
+    // 使用更简单的查询方式
+    const followers = await target.getFollowers({
       attributes: ['id', 'username', 'avatar', 'bio', 'total_study_time', 'streak'],
       offset,
       limit: parseInt(limit)
     });
+    
+    const totalCount = await target.countFollowers();
+    
+    const rows = followers;
+    const count = totalCount;
 
-    const followers = rows.map(u => ({
+    const followersList = rows.map(u => ({
       _id: u.id,
       username: u.username,
       avatar: u.avatar,
@@ -140,7 +142,7 @@ router.get('/followers/:userId', optionalAuth, async (req, res) => {
     }));
 
     return res.json({
-      followers,
+      followers: followersList,
       pagination: {
         current: parseInt(page),
         pages: Math.ceil(count / parseInt(limit)),
@@ -165,7 +167,7 @@ router.get('/feed', authenticateToken, async (req, res) => {
     const followingUsers = await User.findAll({
       include: [{
         model: User,
-        as: 'followers',
+        as: 'following',
         where: { id: userId },
         attributes: []
       }],

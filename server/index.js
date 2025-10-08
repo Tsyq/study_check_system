@@ -27,7 +27,7 @@ app.use(express.urlencoded({ extended: true }));
 sequelize.authenticate()
   .then(() => {
     console.log('MySQL数据库连接成功');
-    return sequelize.sync({ alter: true }); // 同步数据库表结构
+    return sequelize.sync({ force: false }); // 只同步表结构，不强制重建
   })
   .then(() => {
     console.log('数据库表结构同步完成');
