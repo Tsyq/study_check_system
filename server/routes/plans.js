@@ -1,5 +1,5 @@
 const express = require('express');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, optionalAuth } = require('../middleware/auth');
 const { StudyPlan } = require('../models');
 
 const router = express.Router();
@@ -22,7 +22,7 @@ const mapPlanToFrontend = (planInstance) => {
     completedHours: completedHours,
     progressPercentage,
     dailyGoal: plan.daily_goal,
-    milestones: plan.milestones || [],
+    milestones: Array.isArray(plan.milestones) ? plan.milestones : (typeof plan.milestones === 'string' ? JSON.parse(plan.milestones || '[]') : []),
     isActive: plan.is_active,
     isCompleted: plan.is_completed,
     createdAt: plan.createdAt
@@ -70,11 +70,31 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // 获取学习计划列表
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   try {
+    const { userId, status, limit } = req.query;
+    
+    // 确定用户ID：优先使用查询参数，其次使用认证用户ID
+    const targetUserId = userId || (req.user ? req.user.id : null);
+    
+    if (!targetUserId) {
+      return res.status(400).json({ message: '需要指定用户ID或登录' });
+    }
+    
+    const where = { user_id: targetUserId };
+    
+    // 根据状态过滤
+    if (status === 'active') {
+      where.is_active = true;
+      where.is_completed = false;
+    } else if (status === 'completed') {
+      where.is_completed = true;
+    }
+    
     const plans = await StudyPlan.findAll({
-      where: { user_id: req.user.id },
-      order: [['createdAt', 'DESC']]
+      where,
+      order: [['created_at', 'DESC']],
+      limit: limit ? parseInt(limit) : undefined
     });
 
     return res.json({ plans: plans.map(mapPlanToFrontend) });

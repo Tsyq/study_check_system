@@ -35,7 +35,7 @@ const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 interface UserProfile {
-  id: string;
+  id: number;
   username: string;
   email: string;
   avatar: string;
@@ -64,53 +64,11 @@ const Profile: React.FC = () => {
   const [recentCheckins, setRecentCheckins] = useState<RecentCheckin[]>([]);
 
   useEffect(() => {
-    if (user?.id === 'demo-user') {
-      // 演示模式，使用模拟数据
-      const demoProfile: UserProfile = {
-        id: 'demo-user',
-        username: '演示用户',
-        email: 'demo@example.com',
-        avatar: '',
-        bio: '这是一个演示账户，用于展示系统功能。你可以在这里看到各种学习统计和打卡记录。',
-        totalStudyTime: 1250,
-        streak: 7,
-        followers: 15,
-        following: 8,
-        createdAt: new Date(Date.now() - 30 * 86400000).toISOString()
-      };
-
-      const demoRecentCheckins: RecentCheckin[] = [
-        {
-          _id: '1',
-          content: '今天学习了React Hooks，感觉对状态管理有了更深的理解！',
-          studyTime: 120,
-          subject: '编程',
-          createdAt: new Date().toISOString()
-        },
-        {
-          _id: '2',
-          content: '完成了数学作业，解出了几道难题，很有成就感！',
-          studyTime: 90,
-          subject: '数学',
-          createdAt: new Date(Date.now() - 86400000).toISOString()
-        },
-        {
-          _id: '3',
-          content: '英语阅读练习，今天读了一篇关于AI的文章，学到了很多新词汇！',
-          studyTime: 60,
-          subject: '英语',
-          createdAt: new Date(Date.now() - 2 * 86400000).toISOString()
-        }
-      ];
-
-      setProfile(demoProfile);
-      setRecentCheckins(demoRecentCheckins);
-      form.setFieldsValue(demoProfile);
-    } else {
+    if (user?.id) {
       fetchProfile();
       fetchRecentCheckins();
     }
-  }, [user]);
+  }, [user, form, fetchProfile, fetchRecentCheckins]);
 
   const fetchProfile = async () => {
     try {

@@ -39,7 +39,7 @@ interface LeaderboardItem {
 
 interface PersonalStats {
   user: {
-    id: string;
+    id: number;
     username: string;
     avatar: string;
     bio: string;
@@ -69,6 +69,10 @@ interface PersonalStats {
     checkinCount: number;
     avgTime: number;
   }>;
+  checkins: Array<{
+    mood: string;
+    content: string;
+  }>;
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
@@ -83,70 +87,17 @@ const Stats: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (user?.id === 'demo-user') {
-      // 演示模式，使用模拟数据
-      const demoPersonalStats: PersonalStats = {
-        user: {
-          id: 'demo-user',
-          username: '演示用户',
-          avatar: '',
-          bio: '这是一个演示账户',
-          totalStudyTime: 1250,
-          streak: 7,
-          followers: 15,
-          following: 8
-        },
-        studyStats: {
-          totalStudyTime: 1250,
-          totalCheckins: 12,
-          avgStudyTime: 104,
-          subjects: ['编程', '数学', '英语']
-        },
-        dailyStats: [
-          { _id: { year: 2024, month: 1, day: 15 }, studyTime: 120, checkins: 1 },
-          { _id: { year: 2024, month: 1, day: 16 }, studyTime: 90, checkins: 1 },
-          { _id: { year: 2024, month: 1, day: 17 }, studyTime: 150, checkins: 2 },
-          { _id: { year: 2024, month: 1, day: 18 }, studyTime: 80, checkins: 1 },
-          { _id: { year: 2024, month: 1, day: 19 }, studyTime: 200, checkins: 2 }
-        ],
-        subjectStats: [
-          { _id: '编程', totalTime: 600, checkinCount: 6, avgTime: 100 },
-          { _id: '数学', totalTime: 400, checkinCount: 4, avgTime: 100 },
-          { _id: '英语', totalTime: 250, checkinCount: 2, avgTime: 125 }
-        ]
-      };
-
-      const demoLeaderboard: LeaderboardItem[] = [
-        { userId: 'user1', username: '小明', avatar: '', totalStudyTime: 2100, checkinCount: 20, subjects: ['编程', '数学'] },
-        { userId: 'demo-user', username: '演示用户', avatar: '', totalStudyTime: 1250, checkinCount: 12, subjects: ['编程', '数学', '英语'] },
-        { userId: 'user2', username: '小红', avatar: '', totalStudyTime: 1800, checkinCount: 15, subjects: ['英语', '语文'] },
-        { userId: 'user3', username: '小李', avatar: '', totalStudyTime: 1500, checkinCount: 10, subjects: ['数学', '物理'] }
-      ];
-
-      const demoStreakLeaderboard: LeaderboardItem[] = [
-        { userId: 'user1', username: '小明', avatar: '', streak: 12, totalStudyTime: 2100 },
-        { userId: 'user2', username: '小红', avatar: '', streak: 8, totalStudyTime: 1800 },
-        { userId: 'demo-user', username: '演示用户', avatar: '', streak: 7, totalStudyTime: 1250 },
-        { userId: 'user3', username: '小李', avatar: '', streak: 5, totalStudyTime: 1500 }
-      ];
-
-      setPersonalStats(demoPersonalStats);
-      setStudyTimeLeaderboard(demoLeaderboard);
-      setStreakLeaderboard(demoStreakLeaderboard);
-      setLoading(false);
-    } else {
-      if (activeTab === 'personal') {
-        fetchPersonalStats();
-      } else if (activeTab === 'leaderboard') {
-        fetchLeaderboards();
-      }
+    if (activeTab === 'personal') {
+      fetchPersonalStats();
+    } else if (activeTab === 'leaderboard') {
+      fetchLeaderboards();
     }
   }, [activeTab, period, user]);
 
   const fetchPersonalStats = async () => {
     setLoading(true);
     try {
-      const response = await api.get(`/stats/personal/${localStorage.getItem('userId')}?period=${period}`);
+      const response = await api.get(`/stats/personal/${user?.id}?period=${period}`);
       setPersonalStats(response.data);
     } catch (error) {
       message.error('获取个人统计失败');
@@ -193,6 +144,53 @@ const Stats: React.FC = () => {
     }));
   };
 
+  // 格式化情绪分析数据
+  const formatMoodData = (checkins: any[]) => {
+    const moodCount: Record<string, number> = {};
+    checkins.forEach(checkin => {
+      const mood = checkin.mood || 'normal';
+      moodCount[mood] = (moodCount[mood] || 0) + 1;
+    });
+    
+    const moodLabels: Record<string, string> = {
+      'excited': '兴奋',
+      'happy': '开心', 
+      'normal': '正常',
+      'tired': '疲惫',
+      'frustrated': '沮丧'
+    };
+    
+    return Object.entries(moodCount).map(([mood, count], index) => ({
+      name: moodLabels[mood] || mood,
+      value: count,
+      color: COLORS[index % COLORS.length]
+    }));
+  };
+
+  // 格式化学习内容概览数据
+  const formatContentData = (checkins: any[]) => {
+    const contentMap: Record<string, number> = {};
+    checkins.forEach(checkin => {
+      const content = checkin.content || '';
+      // 提取关键词
+      const keywords = content.match(/[\u4e00-\u9fa5]+/g) || [];
+      keywords.forEach((keyword: string) => {
+        if (keyword.length >= 2) {
+          contentMap[keyword] = (contentMap[keyword] || 0) + 1;
+        }
+      });
+    });
+    
+    return Object.entries(contentMap)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 8)
+      .map(([keyword, count], index) => ({
+        name: keyword,
+        value: count,
+        color: COLORS[index % COLORS.length]
+      }));
+  };
+
   // 生成学习习惯分析报告
   const renderPersonalHabitReport = () => {
     if (!personalStats) return null;
@@ -237,6 +235,12 @@ const Stats: React.FC = () => {
 
     const chartData = formatChartData(personalStats.dailyStats);
     const subjectData = formatSubjectData(personalStats.subjectStats);
+    
+    // 获取打卡记录用于情绪分析和内容概览
+    const checkins = personalStats.checkins || [];
+    
+    const moodData = formatMoodData(checkins);
+    const contentData = formatContentData(checkins);
 
     return (
       <div>
@@ -286,30 +290,104 @@ const Stats: React.FC = () => {
           </Col>
         </Row>
 
-        <Row gutter={[16, 16]}>
+        {/* 您要求的三个图表 - 改为两个一行 */}
+        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
           <Col xs={24} lg={12}>
-            <Card title="学习时长趋势">
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
+            <Card title="完成情况饼图">
+              <ResponsiveContainer width="100%" height={350}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: '已完成', value: personalStats.studyStats.totalCheckins, color: '#52c41a' },
+                      { name: '未完成', value: Math.max(0, 30 - personalStats.studyStats.totalCheckins), color: '#f0f0f0' }
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={true}
+                    label={({ name, percent }: any) => {
+                      const percentage = ((percent as number) * 100).toFixed(0);
+                      return `${name}\n${percentage}%`;
+                    }}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    <Cell fill="#52c41a" />
+                    <Cell fill="#f0f0f0" />
+                  </Pie>
                   <Tooltip />
-                  <Line type="monotone" dataKey="studyTime" stroke="#1890ff" strokeWidth={2} />
-                </LineChart>
+                </PieChart>
+              </ResponsiveContainer>
+            </Card>
+          </Col>
+          <Col xs={24} lg={12}>
+            <Card title="情绪分析图">
+              <ResponsiveContainer width="100%" height={350}>
+                <PieChart>
+                  <Pie
+                    data={moodData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={true}
+                    label={({ name, percent }: any) => {
+                      const percentage = ((percent as number) * 100).toFixed(0);
+                      return `${name}\n${percentage}%`;
+                    }}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {moodData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </Card>
+          </Col>
+        </Row>
+        
+        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+          <Col xs={24} lg={12}>
+            <Card title="学习内容概览图">
+              <ResponsiveContainer width="100%" height={350}>
+                <PieChart>
+                  <Pie
+                    data={contentData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={true}
+                    label={({ name, percent }: any) => {
+                      const percentage = ((percent as number) * 100).toFixed(0);
+                      return `${name}\n${percentage}%`;
+                    }}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {contentData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
               </ResponsiveContainer>
             </Card>
           </Col>
           <Col xs={24} lg={12}>
             <Card title="科目学习分布">
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={350}>
                 <PieChart>
                   <Pie
                     data={subjectData}
                     cx="50%"
                     cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }: any) => `${name} ${((percent as number) * 100).toFixed(0)}%`}
+                    labelLine={true}
+                    label={({ name, percent }: any) => {
+                      const percentage = ((percent as number) * 100).toFixed(0);
+                      return `${name}\n${percentage}%`;
+                    }}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
@@ -326,6 +404,25 @@ const Stats: React.FC = () => {
         </Row>
 
         <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+          <Col xs={24} lg={12}>
+            <Card title="学习时长趋势">
+              <ResponsiveContainer width="100%" height={350}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fontSize: 12 }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="studyTime" stroke="#1890ff" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </Card>
+          </Col>
           <Col xs={24} lg={12}>
             <Card title="科目详细统计">
               <List

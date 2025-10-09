@@ -3,7 +3,7 @@ import { message } from 'antd';
 import api from '../services/api';
 
 interface User {
-  id: string;
+  id: number;
   username: string;
   email: string;
   avatar: string;

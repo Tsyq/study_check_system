@@ -22,7 +22,7 @@ const { Text } = Typography;
 
 const Layout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
-  const { user, logout, demoMode, exitDemoMode } = useAuth() as any;
+  const { user, logout } = useAuth() as any;
   const { notifications, markAsRead } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
@@ -62,20 +62,12 @@ const Layout: React.FC = () => {
       label: '个人资料',
       onClick: () => navigate('/profile'),
     },
-    ...(demoMode ? [{
-      key: 'exit-demo',
-      icon: <LogoutOutlined />,
-      label: '退出演示模式',
-      onClick: () => {
-        exitDemoMode();
-        navigate('/login');
-      },
-    }] : [{
+    {
       key: 'logout',
       icon: <LogoutOutlined />,
       label: '退出登录',
       onClick: logout,
-    }]),
+    },
   ];
 
   const handleMenuClick = ({ key }: { key: string }) => {
@@ -157,19 +149,6 @@ const Layout: React.FC = () => {
             />
           </div>
           <div className="header-right">
-            {demoMode && (
-              <div style={{ 
-                marginRight: 16, 
-                padding: '4px 12px', 
-                backgroundColor: '#ff4d4f', 
-                color: 'white', 
-                borderRadius: 12, 
-                fontSize: 12,
-                fontWeight: 'bold'
-              }}>
-                🎯 演示模式
-              </div>
-            )}
             <Dropdown
               menu={{ items: notificationMenuItems }}
               placement="bottomRight"

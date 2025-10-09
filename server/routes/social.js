@@ -195,7 +195,7 @@ router.get('/feed', authenticateToken, async (req, res) => {
         user_id: { [Op.in]: followingIds },
         is_public: true
       },
-      order: [['createdAt', 'DESC']],
+      order: [['created_at', 'DESC']],
       offset,
       limit: parseInt(limit),
       include: [{
@@ -267,7 +267,7 @@ router.get('/search/users', optionalAuth, async (req, res) => {
     const { rows, count } = await User.findAndCountAll({
       where,
       attributes: ['id', 'username', 'avatar', 'bio', 'total_study_time', 'streak'],
-      order: [['createdAt', 'DESC']],
+      order: [['created_at', 'DESC']],
       offset,
       limit: parseInt(limit)
     });
@@ -306,7 +306,7 @@ router.get('/users/:userId', optionalAuth, async (req, res) => {
     const { userId } = req.params;
 
     const u = await User.findByPk(userId, {
-      attributes: ['id', 'username', 'avatar', 'bio', 'total_study_time', 'streak', 'createdAt']
+      attributes: ['id', 'username', 'avatar', 'bio', 'total_study_time', 'streak', 'created_at']
     });
     if (!u) return res.status(404).json({ message: '用户不存在' });
 
@@ -318,7 +318,7 @@ router.get('/users/:userId', optionalAuth, async (req, res) => {
 
     const recent = await Checkin.findAll({
       where: { user_id: u.id, is_public: true },
-      order: [['createdAt', 'DESC']],
+      order: [['created_at', 'DESC']],
       limit: 5,
       include: [{ model: User, as: 'user', attributes: ['id', 'username', 'avatar'] }]
     });
@@ -379,7 +379,7 @@ router.get('/trending/tags', async (req, res) => {
 
     // 简化版：用原始查询统计最近 period 天的标签热度
     const rows = await Checkin.findAll({
-      where: { is_public: true, createdAt: { [Op.gte]: startDate } },
+      where: { is_public: true, created_at: { [Op.gte]: startDate } },
       attributes: ['tags']
     });
     const counter = new Map();
@@ -408,7 +408,7 @@ router.get('/trending/subjects', async (req, res) => {
     startDate.setDate(startDate.getDate() - parseInt(period));
 
     const rows = await Checkin.findAll({
-      where: { is_public: true, createdAt: { [Op.gte]: startDate } },
+      where: { is_public: true, created_at: { [Op.gte]: startDate } },
       attributes: ['subject', 'study_time']
     });
     const agg = new Map();
@@ -440,7 +440,7 @@ router.get('/me/received', authenticateToken, async (req, res) => {
     // 找到我的公开和私有打卡（都可收到互动）
     const myCheckins = await Checkin.findAll({
       where: { user_id: req.user.id },
-      attributes: ['id', 'likes', 'comments', 'createdAt']
+      attributes: ['id', 'likes', 'comments', 'created_at']
     });
 
     const likedItems = [];

@@ -320,33 +320,14 @@ const Plans: React.FC = () => {
       };
       delete planData.dateRange;
 
-      // 演示模式处理 - 现在也保存到数据库
-      if (user?.id === 'demo-user') {
-        // 使用demo_user的ID来保存到数据库
-        const planDataWithUserId = {
-          ...planData,
-          user_id: 1 // demo_user的ID
-        };
-
-        if (editingPlan) {
-          await api.put(`/plans/${editingPlan._id}`, planDataWithUserId);
-          message.success('学习计划更新成功（演示模式）');
-        } else {
-          await api.post('/plans', planDataWithUserId);
-          message.success('学习计划创建成功（演示模式）');
-        }
-        fetchPlans();
+      if (editingPlan) {
+        await api.put(`/plans/${editingPlan._id}`, planData);
+        message.success('学习计划更新成功');
       } else {
-        // 正常模式
-        if (editingPlan) {
-          await api.put(`/plans/${editingPlan._id}`, planData);
-          message.success('学习计划更新成功');
-        } else {
-          await api.post('/plans', planData);
-          message.success('学习计划创建成功');
-        }
-        fetchPlans();
+        await api.post('/plans', planData);
+        message.success('学习计划创建成功');
       }
+      fetchPlans();
 
       setModalVisible(false);
     } catch (error: any) {
@@ -715,7 +696,7 @@ const Plans: React.FC = () => {
                 <Text>{plan.dailyGoal} 分钟</Text>
               </div>
 
-              {plan.milestones && plan.milestones.length > 0 && (
+              {plan.milestones && Array.isArray(plan.milestones) && plan.milestones.length > 0 && (
                 <div style={{ marginTop: 16 }}>
                   <Divider style={{ margin: '12px 0' }} />
                   <Text strong>里程碑：</Text>

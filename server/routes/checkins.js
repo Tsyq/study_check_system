@@ -18,19 +18,34 @@ const mapCheckin = (c) => ({
   comments: c.comments || [],
   isPublic: c.is_public,
   tags: Array.isArray(c.tags) ? c.tags : [],
-  createdAt: c.createdAt
+  createdAt: c.created_at
 });
 
 // 创建打卡并自动更新学习计划进度
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { content, studyTime, subject, images, mood, location, tags, isPublic } = req.body;
+    const { content, studyTime, subject, images, mood, location, tags, isPublic, studyDate } = req.body;
     if (!content || !studyTime || !subject) {
       return res.status(400).json({ message: '请填写打卡内容、学习时长和科目' });
     }
     if (studyTime <= 0) return res.status(400).json({ message: '学习时长必须大于0' });
 
-    const now = new Date();
+    // 处理补卡日期
+    let createdAt = new Date();
+    if (studyDate) {
+      // 验证补卡日期不能是未来日期
+      const selectedDate = new Date(studyDate);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999); // 设置为今天的最后一刻
+      
+      if (selectedDate > today) {
+        return res.status(400).json({ message: '不能为未来日期补卡' });
+      }
+      
+      // 设置补卡日期的时间为当天的一个合理时间
+      createdAt = new Date(studyDate);
+      createdAt.setHours(20, 0, 0, 0); // 设置为晚上8点
+    }
 
     const created = await Checkin.create({
       user_id: req.user.id,
@@ -41,7 +56,9 @@ router.post('/', authenticateToken, async (req, res) => {
       mood: mood || 'normal',
       location: location || '',
       tags: tags || [],
-      is_public: isPublic !== undefined ? !!isPublic : true
+      is_public: isPublic !== undefined ? !!isPublic : true,
+      created_at: createdAt,
+      updated_at: createdAt
     });
 
     // 更新用户学习总时长与连续天数
@@ -52,6 +69,7 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     // 自动匹配并更新学习计划进度（科目一致、在计划时间范围内、进行中的计划）
+    const now = new Date();
     let activePlans = await StudyPlan.findAll({
       where: {
         user_id: req.user.id,
@@ -185,7 +203,7 @@ router.post('/:id/comments', authenticateToken, async (req, res) => {
 // 获取打卡列表（分页）
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    const { page = 1, limit = 10, subject, userId, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    const { page = 1, limit = 10, subject, userId, sortBy = 'created_at', sortOrder = 'desc' } = req.query;
     const where = { is_public: true };
     if (subject) where.subject = subject;
     if (userId) where.user_id = userId;
@@ -231,7 +249,7 @@ router.get('/', optionalAuth, async (req, res) => {
       })) : [],
       isPublic: c.is_public,
       tags: Array.isArray(c.tags) ? c.tags : [],
-      createdAt: c.createdAt,
+      createdAt: c.created_at,
       user: c.user ? {
         _id: c.user.id,
         username: c.user.username,

@@ -1,6 +1,54 @@
 const { sequelize } = require('../models');
 const { User, Checkin, StudyPlan } = require('../models');
 
+// 标准科目列表（与前端一致）
+const STANDARD_SUBJECTS = [
+  '高等数学', '线性代数', '概率论与数理统计', '离散数学', '数学分析',
+  'C语言程序设计', 'Java程序设计', 'Python程序设计', 'C++程序设计', '数据结构与算法',
+  '计算机组成原理', '操作系统', '计算机网络', '数据库原理', '软件工程',
+  '人工智能', '机器学习', '深度学习', '计算机图形学', '数字图像处理',
+  '编译原理', '计算机体系结构', '信息安全', '密码学', 'Web开发',
+  '移动应用开发', '数据分析', '算法设计与分析', '计算机视觉', '其他'
+];
+
+// 学习地点
+const STUDY_LOCATIONS = ['图书馆', '教室', '寝室', '咖啡厅'];
+
+// 心情选项
+const MOODS = ['excited', 'happy', 'normal', 'tired', 'frustrated'];
+
+// 生成随机中文姓名
+function generateChineseName() {
+  const surnames = ['李', '王', '张', '刘', '陈', '杨', '赵', '黄', '周', '吴', '徐', '孙', '胡', '朱', '高', '林', '何', '郭', '马', '罗'];
+  const givenNames = ['明', '芳', '伟', '敏', '静', '强', '丽', '华', '军', '红', '涛', '艳', '杰', '雪', '峰', '霞', '斌', '燕', '超', '梅'];
+  
+  const surname = surnames[Math.floor(Math.random() * surnames.length)];
+  const givenName = givenNames[Math.floor(Math.random() * givenNames.length)];
+  return surname + givenName;
+}
+
+// 生成学习内容
+function generateStudyContent(subject) {
+  const contentTemplates = {
+    '高等数学': ['复习微积分基础概念', '练习极限计算', '学习导数应用', '完成数学作业'],
+    '数据结构与算法': ['学习链表操作', '练习排序算法', '复习二叉树遍历', '完成算法题'],
+    'Web开发': ['学习React组件', '练习CSS布局', '学习JavaScript ES6', '完成前端项目'],
+    '数据库原理': ['学习SQL查询', '练习数据库设计', '学习索引优化', '完成数据库作业'],
+    '其他': ['阅读课外书籍', '学习新技能', '完成作业', '复习课程内容']
+  };
+  
+  const templates = contentTemplates[subject] || contentTemplates['其他'];
+  return templates[Math.floor(Math.random() * templates.length)];
+}
+
+// 生成随机日期（2025年7月1日到10月9日）
+function generateRandomDate() {
+  const start = new Date('2025-07-01');
+  const end = new Date('2025-10-09');
+  const randomTime = start.getTime() + Math.random() * (end.getTime() - start.getTime());
+  return new Date(randomTime);
+}
+
 async function initDatabase() {
   try {
     console.log('开始初始化数据库...');
@@ -16,107 +64,106 @@ async function initDatabase() {
     // 创建示例数据
     console.log('创建示例数据...');
     
-    // 创建示例用户
-    const demoUser = await User.create({
-      username: 'demo_user',
-      email: 'demo@example.com',
-      password: '123456',
-      bio: '这是一个演示用户',
-      total_study_time: 1250,
-      streak: 7
-    });
+    // 创建20个用户
+    const users = [];
+    for (let i = 1; i <= 20; i++) {
+      const username = generateChineseName();
+      const user = await User.create({
+        username: username,
+        email: `${username}${i}@example.com`,
+        password: '123456',
+        bio: `这是用户${username}的个人简介`,
+        total_study_time: Math.floor(Math.random() * 5000) + 8000, // 8000-13000分钟
+        streak: Math.floor(Math.random() * 20) + 20 // 20-40天
+      });
+      users.push(user);
+    }
     
-    const testUser = await User.create({
-      username: 'test_user',
-      email: 'test@example.com',
-      password: '123456',
-      bio: '测试用户',
-      total_study_time: 800,
-      streak: 5
-    });
+    console.log(`${users.length}个用户创建成功`);
     
-    console.log('示例用户创建成功');
+    // 为每个用户创建打卡记录（约150条/用户）
+    let totalCheckins = 0;
+    for (const user of users) {
+      const checkinCount = Math.floor(Math.random() * 50) + 100; // 100-150条
+      
+      for (let i = 0; i < checkinCount; i++) {
+        const subject = STANDARD_SUBJECTS[Math.floor(Math.random() * STANDARD_SUBJECTS.length)];
+        const studyTime = Math.floor(Math.random() * 120) + 30; // 30-150分钟
+        const mood = MOODS[Math.floor(Math.random() * MOODS.length)];
+        const location = STUDY_LOCATIONS[Math.floor(Math.random() * STUDY_LOCATIONS.length)];
+        const createdAt = generateRandomDate();
+        
+        await Checkin.create({
+          user_id: user.id,
+          content: generateStudyContent(subject),
+          study_time: studyTime,
+          subject: subject,
+          mood: mood,
+          location: location,
+          tags: [subject, '学习'],
+          created_at: createdAt,
+          updated_at: createdAt
+        });
+        
+        totalCheckins++;
+      }
+    }
     
-    // 创建示例打卡记录
-    await Checkin.create({
-      user_id: demoUser.id,
-      content: '今天学习了React Hooks，感觉对状态管理有了更深的理解！',
-      study_time: 120,
-      subject: '编程',
-      mood: 'happy',
-      location: '图书馆',
-      tags: ['React', '前端开发']
-    });
+    console.log(`${totalCheckins}条打卡记录创建成功`);
     
-    await Checkin.create({
-      user_id: demoUser.id,
-      content: '完成了数学作业，解出了几道难题，很有成就感！',
-      study_time: 90,
-      subject: '数学',
-      mood: 'excited',
-      location: '宿舍',
-      tags: ['微积分', '作业']
-    });
+    // 为每个用户创建学习计划（2-4个/用户）
+    let totalPlans = 0;
+    for (const user of users) {
+      const planCount = Math.floor(Math.random() * 3) + 2; // 2-4个计划
+      
+      for (let i = 0; i < planCount; i++) {
+        const subject = STANDARD_SUBJECTS[Math.floor(Math.random() * STANDARD_SUBJECTS.length)];
+        const totalHours = Math.floor(Math.random() * 50) + 20; // 20-70小时
+        const completedHours = Math.floor(Math.random() * totalHours);
+        const startDate = generateRandomDate();
+        const endDate = new Date(startDate.getTime() + Math.random() * 30 * 24 * 60 * 60 * 1000); // 30天内
+        
+        await StudyPlan.create({
+          user_id: user.id,
+          title: `${subject}学习计划`,
+          description: `深入学习${subject}相关知识和技能`,
+          subject: subject,
+          target: `掌握${subject}核心概念`,
+          start_date: startDate,
+          end_date: endDate,
+          total_hours: totalHours,
+          completed_hours: completedHours,
+          daily_goal: Math.floor(Math.random() * 60) + 60, // 60-120分钟
+          milestones: JSON.stringify([
+            {
+              title: '基础概念学习',
+              description: '掌握基础理论知识',
+              target_date: new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000),
+              is_completed: Math.random() > 0.5
+            },
+            {
+              title: '实践练习',
+              description: '通过练习巩固知识',
+              target_date: new Date(startDate.getTime() + 14 * 24 * 60 * 60 * 1000),
+              is_completed: Math.random() > 0.7
+            }
+          ])
+        });
+        
+        totalPlans++;
+      }
+    }
     
-    await Checkin.create({
-      user_id: testUser.id,
-      content: '英语阅读练习，今天读了一篇关于AI的文章，学到了很多新词汇！',
-      study_time: 60,
-      subject: '英语',
-      mood: 'normal',
-      location: '咖啡厅',
-      tags: ['阅读', 'AI']
-    });
+    console.log(`${totalPlans}个学习计划创建成功`);
     
-    console.log('示例打卡记录创建成功');
-    
-    // 创建示例学习计划
-    await StudyPlan.create({
-      user_id: demoUser.id,
-      title: 'React学习计划',
-      description: '深入学习React框架，掌握现代前端开发技能',
-      subject: '编程',
-      target: '掌握React核心概念和最佳实践',
-      start_date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
-      end_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-      total_hours: 50,
-      completed_hours: 32.5,
-      daily_goal: 120,
-      milestones: [
-        {
-          title: '完成基础语法学习',
-          description: '掌握JSX、组件、Props等基础概念',
-          target_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-          is_completed: true
-        },
-        {
-          title: '学习Hooks',
-          description: '掌握useState、useEffect等常用Hooks',
-          target_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-          is_completed: false
-        }
-      ]
-    });
-    
-    await StudyPlan.create({
-      user_id: demoUser.id,
-      title: '期末考试复习',
-      description: '全面复习数学课程，准备期末考试',
-      subject: '数学',
-      target: '期末考试达到90分以上',
-      start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-      end_date: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000),
-      total_hours: 30,
-      completed_hours: 12,
-      daily_goal: 90
-    });
-    
-    console.log('示例学习计划创建成功');
-    
-    console.log('数据库初始化完成！');
-    console.log('示例用户:');
-    console.log('- demo@example.com / 123456');
-    console.log('- test@example.com / 123456');
+    console.log('\n数据库初始化完成！');
+    console.log('示例用户账号:');
+    console.log('- 李明1@example.com / 123456');
+    console.log('- 王芳2@example.com / 123456');
+    console.log('- 张伟3@example.com / 123456');
+    console.log('- 刘敏4@example.com / 123456');
+    console.log('- 陈静5@example.com / 123456');
+    console.log('... (共20个用户)');
     
   } catch (error) {
     console.error('数据库初始化失败:', error);

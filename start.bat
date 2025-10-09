@@ -10,11 +10,11 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo 检查MongoDB服务...
-mongod --version >nul 2>&1
+echo 检查MySQL服务...
+mysql --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo 警告: 未找到MongoDB，请确保MongoDB已安装并启动
-    echo 如果没有安装MongoDB，请访问: https://www.mongodb.com/try/download/community
+    echo 警告: 未找到MySQL，请确保MySQL已安装并启动
+    echo 如果没有安装MySQL，请访问: https://dev.mysql.com/downloads/mysql/
 )
 
 echo.
@@ -46,6 +46,17 @@ if not exist client\.env (
     copy client\env.example client\.env
     echo 已创建 client\.env 文件
 )
+
+echo.
+echo 检查数据库...
+echo 正在检查数据库连接和初始化...
+
+cd server
+node scripts/init-db.js
+if %errorlevel% neq 0 (
+    echo 警告: 数据库初始化可能失败，但继续启动服务
+)
+cd ..
 
 echo.
 echo 启动项目...

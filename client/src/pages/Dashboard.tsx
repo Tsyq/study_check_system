@@ -16,7 +16,7 @@ import api from '../services/api';
 const { Title, Text } = Typography;
 
 interface Checkin {
-  _id: string;
+  _id: number;
   content: string;
   studyTime: number;
   subject: string;
@@ -51,7 +51,7 @@ const Dashboard: React.FC = () => {
     try {
       const [checkinsResponse, plansResponse] = await Promise.all([
         api.get(`/checkins?userId=${user?.id}&limit=5`),
-        api.get('/plans?status=active&limit=3')
+        api.get(`/plans?userId=${user?.id}&status=active&limit=3`)
       ]);
 
       setRecentCheckins(checkinsResponse.data.checkins);

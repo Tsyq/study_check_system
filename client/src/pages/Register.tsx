@@ -70,8 +70,8 @@ const Register: React.FC = () => {
                 name="username"
                 rules={[
                   { required: true, message: '请输入用户名' },
-                  { min: 3, message: '用户名至少3个字符' },
-                  { max: 20, message: '用户名最多20个字符' }
+                  { min: 2, message: '用户名至少2个字符' },
+                  { max: 60, message: '用户名最多60个字符' }
                 ]}
               >
                 <Input
