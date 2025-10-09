@@ -57,7 +57,7 @@ const Dashboard: React.FC = () => {
       setRecentCheckins(checkinsResponse.data.checkins);
       setActivePlans(plansResponse.data.plans);
     } catch (error) {
-      console.error('获取仪表盘数据失败:', error);
+      console.error('获取首页数据失败:', error);
     } finally {
       setLoading(false);
     }

@@ -45,6 +45,10 @@ app.use('/api/checkins', require('./routes/checkins'));
 app.use('/api/plans', require('./routes/plans'));
 app.use('/api/social', require('./routes/social'));
 app.use('/api/stats', require('./routes/stats'));
+app.use('/api/upload', require('./routes/upload'));
+
+// 静态文件服务 - 提供上传的文件访问
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // 前端静态资源（生产环境或需要同源访问时）
 const clientBuildPath = path.join(__dirname, '..', 'client', 'build');

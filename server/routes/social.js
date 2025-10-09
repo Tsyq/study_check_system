@@ -164,16 +164,15 @@ router.get('/feed', authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
     // 查询当前用户关注的用户ID
-    const followingUsers = await User.findAll({
+    const currentUser = await User.findByPk(userId, {
       include: [{
         model: User,
         as: 'following',
-        where: { id: userId },
-        attributes: []
-      }],
-      attributes: ['id']
+        attributes: ['id']
+      }]
     });
-    const followingIds = followingUsers.map(u => u.id);
+    
+    const followingIds = currentUser.following.map(u => u.id);
 
     if (followingIds.length === 0) {
       return res.json({

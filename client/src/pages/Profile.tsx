@@ -10,10 +10,7 @@ import {
   Col, 
   Upload, 
   message,
-  Divider,
-  Statistic,
-  List,
-  Tag,
+  Modal,
   Space
 } from 'antd';
 import { 
@@ -21,18 +18,21 @@ import {
   EditOutlined, 
   SaveOutlined, 
   CameraOutlined,
-  ClockCircleOutlined,
-  FireOutlined,
-  TeamOutlined,
-  BookOutlined,
-  TrophyOutlined,
-  UserAddOutlined
+  LockOutlined,
+  MailOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
+
+// 处理头像URL的函数
+const getAvatarUrl = (avatar: string | undefined) => {
+  if (!avatar) return undefined;
+  if (avatar.startsWith('http')) return avatar;
+  return `http://localhost:5000${avatar}`;
+};
 
 interface UserProfile {
   id: number;
@@ -47,21 +47,15 @@ interface UserProfile {
   createdAt: string;
 }
 
-interface RecentCheckin {
-  _id: string;
-  content: string;
-  studyTime: number;
-  subject: string;
-  createdAt: string;
-}
-
 const Profile: React.FC = () => {
   const { user, updateUser } = useAuth();
   const [form] = Form.useForm();
+  const [passwordForm] = Form.useForm();
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [recentCheckins, setRecentCheckins] = useState<RecentCheckin[]>([]);
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -73,21 +67,11 @@ const Profile: React.FC = () => {
     }
   }, [form]);
 
-  const fetchRecentCheckins = useCallback(async () => {
-    try {
-      const response = await api.get(`/checkins?userId=${user?.id}&limit=5`);
-      setRecentCheckins(response.data.checkins);
-    } catch (error) {
-      console.error('获取最近打卡失败:', error);
-    }
-  }, [user?.id]);
-
   useEffect(() => {
     if (user?.id) {
       fetchProfile();
-      fetchRecentCheckins();
     }
-  }, [user?.id, fetchProfile, fetchRecentCheckins]);
+  }, [user?.id, fetchProfile]);
 
   const handleEdit = () => {
     setEditing(true);
@@ -113,19 +97,41 @@ const Profile: React.FC = () => {
     form.setFieldsValue(profile);
   };
 
-  const handleAvatarChange = (info: any) => {
-    if (info.file.status === 'done') {
-      message.success('头像上传成功');
-      fetchProfile();
-    } else if (info.file.status === 'error') {
-      message.error('头像上传失败');
+  const handlePasswordChange = async (values: any) => {
+    setPasswordLoading(true);
+    try {
+      await api.put('/auth/password', {
+        currentPassword: values.currentPassword,
+        newPassword: values.newPassword
+      });
+      message.success('密码修改成功');
+      setPasswordModalVisible(false);
+      passwordForm.resetFields();
+    } catch (error: any) {
+      message.error(error.response?.data?.message || '密码修改失败');
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
-  const formatTime = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return hours > 0 ? `${hours}小时${mins}分钟` : `${mins}分钟`;
+  const showPasswordModal = () => {
+    setPasswordModalVisible(true);
+  };
+
+  const handleAvatarChange = (info: any) => {
+    if (info.file.status === 'uploading') {
+      return;
+    }
+    if (info.file.status === 'done') {
+      message.success('头像上传成功');
+      // 更新本地头像显示
+      if (info.file.response && info.file.response.avatarUrl) {
+        setProfile(prev => prev ? { ...prev, avatar: info.file.response.avatarUrl } : null);
+      }
+      fetchProfile(); // 重新获取用户信息
+    } else if (info.file.status === 'error') {
+      message.error('头像上传失败');
+    }
   };
 
   return (
@@ -141,14 +147,30 @@ const Profile: React.FC = () => {
                 name="avatar"
                 listType="picture-circle"
                 showUploadList={false}
-                action="/api/upload/avatar"
+                action="http://localhost:5000/api/upload/avatar"
+                headers={{
+                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }}
                 onChange={handleAvatarChange}
                 disabled={!editing}
+                beforeUpload={(file) => {
+                  const isImage = file.type.startsWith('image/');
+                  if (!isImage) {
+                    message.error('只能上传图片文件!');
+                    return false;
+                  }
+                  const isLt5M = file.size / 1024 / 1024 < 5;
+                  if (!isLt5M) {
+                    message.error('图片大小不能超过5MB!');
+                    return false;
+                  }
+                  return true;
+                }}
               >
                 <div style={{ position: 'relative' }}>
                   <Avatar 
                     size={120} 
-                    src={profile?.avatar || undefined} 
+                    src={getAvatarUrl(profile?.avatar)} 
                     icon={<UserOutlined />}
                   />
                   {editing && (
@@ -186,11 +208,30 @@ const Profile: React.FC = () => {
                 label="用户名"
                 rules={[
                   { required: true, message: '请输入用户名' },
-                  { min: 3, message: '用户名至少3个字符' },
-                  { max: 20, message: '用户名最多20个字符' }
+                  { min: 2, message: '用户名至少2个字符' },
+                  { max: 60, message: '用户名最多60个字符' },
+                  { 
+                    pattern: /^[\u4e00-\u9fa5a-zA-Z0-9_\s]+$/, 
+                    message: '用户名只能包含中文、英文、数字、下划线和空格' 
+                  }
                 ]}
               >
                 <Input disabled={!editing} />
+              </Form.Item>
+
+              <Form.Item
+                name="email"
+                label="邮箱"
+                rules={[
+                  { required: true, message: '请输入邮箱' },
+                  { type: 'email', message: '请输入有效的邮箱地址' }
+                ]}
+              >
+                <Input 
+                  disabled={!editing} 
+                  prefix={<MailOutlined />}
+                  placeholder="请输入邮箱地址"
+                />
               </Form.Item>
 
               <Form.Item
@@ -224,92 +265,113 @@ const Profile: React.FC = () => {
                   </Space>
                 </Form.Item>
               ) : (
-                <Button 
-                  type="primary" 
-                  icon={<EditOutlined />}
-                  onClick={handleEdit}
-                  block
-                >
-                  编辑资料
-                </Button>
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Button 
+                    type="primary" 
+                    icon={<EditOutlined />}
+                    onClick={handleEdit}
+                    block
+                  >
+                    编辑资料
+                  </Button>
+                  <Button 
+                    icon={<LockOutlined />}
+                    onClick={showPasswordModal}
+                    block
+                  >
+                    修改密码
+                  </Button>
+                </Space>
               )}
             </Form>
           </Card>
         </Col>
-
-        {/* 学习统计 */}
-        <Col xs={24} lg={16}>
-          <Row gutter={[16, 16]}>
-            <Col xs={12} sm={6}>
-              <Card>
-                <Statistic
-                  title="总学习时长"
-                  value={profile?.totalStudyTime || 0}
-                  suffix="分钟"
-                  prefix={<ClockCircleOutlined />}
-                  valueStyle={{ color: '#1890ff' }}
-                />
-              </Card>
-            </Col>
-            <Col xs={12} sm={6}>
-              <Card>
-                <Statistic
-                  title="连续打卡"
-                  value={profile?.streak || 0}
-                  suffix="天"
-                  prefix={<FireOutlined />}
-                  valueStyle={{ color: '#f5222d' }}
-                />
-              </Card>
-            </Col>
-            <Col xs={12} sm={6}>
-              <Card>
-                <Statistic
-                  title="关注者"
-                  value={profile?.followers || 0}
-                  prefix={<TrophyOutlined />}
-                  valueStyle={{ color: '#52c41a' }}
-                />
-              </Card>
-            </Col>
-            <Col xs={12} sm={6}>
-              <Card>
-                <Statistic
-                  title="正在关注"
-                  value={profile?.following || 0}
-                  prefix={<UserAddOutlined />}
-                  valueStyle={{ color: '#722ed1' }}
-                />
-              </Card>
-            </Col>
-          </Row>
-
-          <Card title="最近打卡" style={{ marginTop: 16 }}>
-            <List
-              dataSource={recentCheckins}
-              renderItem={(item) => (
-                <List.Item>
-                  <div style={{ width: '100%' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <Text strong>{item.content}</Text>
-                      <Tag icon={<BookOutlined />}>{item.subject}</Tag>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Text type="secondary">
-                        {formatTime(item.studyTime)}
-                      </Text>
-                      <Text type="secondary">
-                        {new Date(item.createdAt).toLocaleDateString()}
-                      </Text>
-                    </div>
-                  </div>
-                </List.Item>
-              )}
-              locale={{ emptyText: '还没有打卡记录' }}
-            />
-          </Card>
-        </Col>
       </Row>
+
+      {/* 修改密码模态框 */}
+      <Modal
+        title="修改密码"
+        open={passwordModalVisible}
+        onCancel={() => {
+          setPasswordModalVisible(false);
+          passwordForm.resetFields();
+        }}
+        footer={null}
+      >
+        <Form
+          form={passwordForm}
+          layout="vertical"
+          onFinish={handlePasswordChange}
+        >
+          <Form.Item
+            name="currentPassword"
+            label="当前密码"
+            rules={[{ required: true, message: '请输入当前密码' }]}
+          >
+            <Input.Password 
+              prefix={<LockOutlined />}
+              placeholder="请输入当前密码"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="newPassword"
+            label="新密码"
+            rules={[
+              { required: true, message: '请输入新密码' },
+              { min: 6, message: '密码至少6个字符' }
+            ]}
+          >
+            <Input.Password 
+              prefix={<LockOutlined />}
+              placeholder="请输入新密码"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="confirmPassword"
+            label="确认新密码"
+            dependencies={['newPassword']}
+            rules={[
+              { required: true, message: '请确认新密码' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('newPassword') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('两次输入的密码不一致'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password 
+              prefix={<LockOutlined />}
+              placeholder="请再次输入新密码"
+            />
+          </Form.Item>
+
+          <Form.Item>
+            <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+              <Button 
+                onClick={() => {
+                  setPasswordModalVisible(false);
+                  passwordForm.resetFields();
+                }}
+              >
+                取消
+              </Button>
+              <Button 
+                type="primary" 
+                htmlType="submit" 
+                loading={passwordLoading}
+                icon={<LockOutlined />}
+              >
+                确认修改
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };
