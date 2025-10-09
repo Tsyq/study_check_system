@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Card, 
   Form, 
@@ -63,14 +63,7 @@ const Profile: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [recentCheckins, setRecentCheckins] = useState<RecentCheckin[]>([]);
 
-  useEffect(() => {
-    if (user?.id) {
-      fetchProfile();
-      fetchRecentCheckins();
-    }
-  }, [user, form, fetchProfile, fetchRecentCheckins]);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       const response = await api.get('/auth/me');
       setProfile(response.data.user);
@@ -78,16 +71,23 @@ const Profile: React.FC = () => {
     } catch (error) {
       message.error('获取个人信息失败');
     }
-  };
+  }, [form]);
 
-  const fetchRecentCheckins = async () => {
+  const fetchRecentCheckins = useCallback(async () => {
     try {
       const response = await api.get(`/checkins?userId=${user?.id}&limit=5`);
       setRecentCheckins(response.data.checkins);
     } catch (error) {
       console.error('获取最近打卡失败:', error);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchProfile();
+      fetchRecentCheckins();
+    }
+  }, [user?.id, fetchProfile, fetchRecentCheckins]);
 
   const handleEdit = () => {
     setEditing(true);
