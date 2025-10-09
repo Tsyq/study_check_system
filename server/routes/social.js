@@ -310,6 +310,12 @@ router.get('/users/:userId', optionalAuth, async (req, res) => {
     });
     if (!u) return res.status(404).json({ message: '用户不存在' });
 
+    // 获取关注者和正在关注的数量
+    const [followersCount, followingCount] = await Promise.all([
+      u.countFollowers(),
+      u.countFollowing()
+    ]);
+
     const recent = await Checkin.findAll({
       where: { user_id: u.id, is_public: true },
       order: [['createdAt', 'DESC']],
@@ -350,6 +356,8 @@ router.get('/users/:userId', optionalAuth, async (req, res) => {
         bio: u.bio,
         totalStudyTime: u.total_study_time,
         streak: u.streak,
+        followers: followersCount,
+        following: followingCount,
         createdAt: u.createdAt
       },
       recentCheckins,

@@ -6,7 +6,8 @@ import {
   TrophyOutlined,
   CalendarOutlined,
   PlusOutlined,
-  RightOutlined
+  RightOutlined,
+  UserAddOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -133,7 +134,7 @@ const Dashboard: React.FC = () => {
             <Statistic
               title="正在关注"
               value={user?.following || 0}
-              prefix={<CalendarOutlined />}
+              prefix={<UserAddOutlined />}
               valueStyle={{ color: '#722ed1' }}
             />
           </Card>

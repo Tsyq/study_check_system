@@ -24,7 +24,9 @@ import {
   ClockCircleOutlined,
   FireOutlined,
   TeamOutlined,
-  BookOutlined
+  BookOutlined,
+  TrophyOutlined,
+  UserAddOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
@@ -307,7 +309,7 @@ const Profile: React.FC = () => {
                 <Statistic
                   title="关注者"
                   value={profile?.followers || 0}
-                  prefix={<TeamOutlined />}
+                  prefix={<TrophyOutlined />}
                   valueStyle={{ color: '#52c41a' }}
                 />
               </Card>
@@ -317,7 +319,7 @@ const Profile: React.FC = () => {
                 <Statistic
                   title="正在关注"
                   value={profile?.following || 0}
-                  prefix={<TeamOutlined />}
+                  prefix={<UserAddOutlined />}
                   valueStyle={{ color: '#722ed1' }}
                 />
               </Card>

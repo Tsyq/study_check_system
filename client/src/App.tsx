@@ -4,6 +4,7 @@ import { ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { AuthProvider } from './contexts/AuthContext';
 import { SocketProvider } from './contexts/SocketContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -20,8 +21,9 @@ const App: React.FC = () => {
   return (
     <ConfigProvider locale={zhCN}>
       <AuthProvider>
-        <SocketProvider>
-          <Router>
+        <NotificationProvider>
+          <SocketProvider>
+            <Router>
             <div className="App">
               <Routes>
                 <Route path="/login" element={<Login />} />
@@ -41,8 +43,9 @@ const App: React.FC = () => {
                 </Route>
               </Routes>
             </div>
-          </Router>
-        </SocketProvider>
+            </Router>
+          </SocketProvider>
+        </NotificationProvider>
       </AuthProvider>
     </ConfigProvider>
   );

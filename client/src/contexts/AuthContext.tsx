@@ -22,6 +22,7 @@ interface AuthContextType {
   register: (username: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
+  refreshUser: () => Promise<void>;
   loading: boolean;
 }
 
@@ -110,6 +111,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const refreshUser = async () => {
+    if (token) {
+      try {
+        const response = await api.get('/auth/me');
+        setUser(response.data.user);
+      } catch (error) {
+        console.error('刷新用户信息失败:', error);
+      }
+    }
+  };
+
   const value: AuthContextType = {
     user,
     token,
@@ -117,6 +129,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     register,
     logout,
     updateUser,
+    refreshUser,
     loading
   };
 
