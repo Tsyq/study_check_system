@@ -73,6 +73,13 @@ interface PersonalStats {
     mood: string;
     content: string;
   }>;
+  planStats: {
+    totalPlans: number;
+    completedPlans: number;
+    activePlans: number;
+    totalTargetHours: number;
+    totalCompletedHours: number;
+  };
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
@@ -167,30 +174,6 @@ const Stats: React.FC = () => {
     }));
   };
 
-  // 格式化学习内容概览数据
-  const formatContentData = (checkins: any[]) => {
-    const contentMap: Record<string, number> = {};
-    checkins.forEach(checkin => {
-      const content = checkin.content || '';
-      // 提取关键词
-      const keywords = content.match(/[\u4e00-\u9fa5]+/g) || [];
-      keywords.forEach((keyword: string) => {
-        if (keyword.length >= 2) {
-          contentMap[keyword] = (contentMap[keyword] || 0) + 1;
-        }
-      });
-    });
-    
-    return Object.entries(contentMap)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 8)
-      .map(([keyword, count], index) => ({
-        name: keyword,
-        value: count,
-        color: COLORS[index % COLORS.length]
-      }));
-  };
-
   // 生成学习习惯分析报告
   const renderPersonalHabitReport = () => {
     if (!personalStats) return null;
@@ -236,11 +219,10 @@ const Stats: React.FC = () => {
     const chartData = formatChartData(personalStats.dailyStats);
     const subjectData = formatSubjectData(personalStats.subjectStats);
     
-    // 获取打卡记录用于情绪分析和内容概览
+    // 获取打卡记录用于情绪分析
     const checkins = personalStats.checkins || [];
     
     const moodData = formatMoodData(checkins);
-    const contentData = formatContentData(checkins);
 
     return (
       <div>
@@ -282,7 +264,7 @@ const Stats: React.FC = () => {
             <Card>
               <Statistic
                 title="学习科目"
-                value={personalStats.studyStats.subjects.length}
+                value={new Set(personalStats.studyStats.subjects).size}
                 prefix={<UserOutlined />}
                 valueStyle={{ color: '#fa8c16' }}
               />
@@ -298,8 +280,9 @@ const Stats: React.FC = () => {
                 <PieChart>
                   <Pie
                     data={[
-                      { name: '已完成', value: personalStats.studyStats.totalCheckins, color: '#52c41a' },
-                      { name: '未完成', value: Math.max(0, 30 - personalStats.studyStats.totalCheckins), color: '#f0f0f0' }
+                      { name: '已完成', value: personalStats.planStats.completedPlans, color: '#52c41a' },
+                      { name: '进行中', value: personalStats.planStats.activePlans, color: '#1890ff' },
+                      { name: '未开始', value: Math.max(0, personalStats.planStats.totalPlans - personalStats.planStats.completedPlans - personalStats.planStats.activePlans), color: '#f0f0f0' }
                     ]}
                     cx="50%"
                     cy="50%"
@@ -313,6 +296,7 @@ const Stats: React.FC = () => {
                     dataKey="value"
                   >
                     <Cell fill="#52c41a" />
+                    <Cell fill="#1890ff" />
                     <Cell fill="#f0f0f0" />
                   </Pie>
                   <Tooltip />
@@ -350,28 +334,21 @@ const Stats: React.FC = () => {
         
         <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
           <Col xs={24} lg={12}>
-            <Card title="学习内容概览图">
+            <Card title="学习时长趋势">
               <ResponsiveContainer width="100%" height={350}>
-                <PieChart>
-                  <Pie
-                    data={contentData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={true}
-                    label={({ name, percent }: any) => {
-                      const percentage = ((percent as number) * 100).toFixed(0);
-                      return `${name}\n${percentage}%`;
-                    }}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {contentData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fontSize: 12 }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis />
                   <Tooltip />
-                </PieChart>
+                  <Line type="monotone" dataKey="studyTime" stroke="#1890ff" strokeWidth={2} />
+                </LineChart>
               </ResponsiveContainer>
             </Card>
           </Col>
@@ -404,25 +381,6 @@ const Stats: React.FC = () => {
         </Row>
 
         <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-          <Col xs={24} lg={12}>
-            <Card title="学习时长趋势">
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="date" 
-                    tick={{ fontSize: 12 }}
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
-                  />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="studyTime" stroke="#1890ff" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </Card>
-          </Col>
           <Col xs={24} lg={12}>
             <Card title="科目详细统计">
               <List

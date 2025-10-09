@@ -20,6 +20,13 @@ import './Layout.css';
 const { Header, Sider, Content } = AntLayout;
 const { Text } = Typography;
 
+// 处理头像URL的函数
+const getAvatarUrl = (avatar: string | undefined) => {
+  if (!avatar) return undefined;
+  if (avatar.startsWith('http')) return avatar;
+  return `http://localhost:5000${avatar}`;
+};
+
 const Layout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const { user, logout } = useAuth() as any;
@@ -31,7 +38,7 @@ const Layout: React.FC = () => {
     {
       key: '/dashboard',
       icon: <DashboardOutlined />,
-      label: '仪表盘',
+      label: '首页',
     },
     {
       key: '/checkin',
@@ -163,7 +170,10 @@ const Layout: React.FC = () => {
               arrow
             >
               <div className="user-info">
-                <Avatar src={user?.avatar || undefined} icon={<UserOutlined />} />
+                <Avatar 
+                  src={getAvatarUrl(user?.avatar)} 
+                  icon={<UserOutlined />} 
+                />
                 <span className="username">{user?.username}</span>
               </div>
             </Dropdown>

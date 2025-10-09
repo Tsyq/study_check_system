@@ -153,7 +153,7 @@ router.get('/me', authenticateToken, async (req, res) => {
 // 更新用户信息
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
-    const { username, bio, avatar } = req.body;
+    const { username, email, bio, avatar } = req.body;
     const userId = req.user.id;
 
     // 检查用户名是否已被其他用户使用
@@ -169,8 +169,22 @@ router.put('/profile', authenticateToken, async (req, res) => {
       }
     }
 
+    // 检查邮箱是否已被其他用户使用
+    if (email && email !== req.user.email) {
+      const existingUser = await User.findOne({
+        where: {
+          email,
+          id: { [Op.ne]: userId }
+        }
+      });
+      if (existingUser) {
+        return res.status(400).json({ message: '邮箱已被使用' });
+      }
+    }
+
     const updateData = {};
     if (username) updateData.username = username;
+    if (email) updateData.email = email;
     if (bio !== undefined) updateData.bio = bio;
     if (avatar !== undefined) updateData.avatar = avatar;
 
