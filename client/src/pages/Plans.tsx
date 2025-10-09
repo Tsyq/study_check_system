@@ -320,33 +320,14 @@ const Plans: React.FC = () => {
       };
       delete planData.dateRange;
 
-      // 演示模式处理 - 现在也保存到数据库
-      if (user?.id === 'demo-user') {
-        // 使用demo_user的ID来保存到数据库
-        const planDataWithUserId = {
-          ...planData,
-          user_id: 1 // demo_user的ID
-        };
-
-        if (editingPlan) {
-          await api.put(`/plans/${editingPlan._id}`, planDataWithUserId);
-          message.success('学习计划更新成功（演示模式）');
-        } else {
-          await api.post('/plans', planDataWithUserId);
-          message.success('学习计划创建成功（演示模式）');
-        }
-        fetchPlans();
+      if (editingPlan) {
+        await api.put(`/plans/${editingPlan._id}`, planData);
+        message.success('学习计划更新成功');
       } else {
-        // 正常模式
-        if (editingPlan) {
-          await api.put(`/plans/${editingPlan._id}`, planData);
-          message.success('学习计划更新成功');
-        } else {
-          await api.post('/plans', planData);
-          message.success('学习计划创建成功');
-        }
-        fetchPlans();
+        await api.post('/plans', planData);
+        message.success('学习计划创建成功');
       }
+      fetchPlans();
 
       setModalVisible(false);
     } catch (error: any) {
@@ -489,6 +470,7 @@ const Plans: React.FC = () => {
   const getStatusColor = (plan: StudyPlan) => {
     if (plan.isCompleted) return 'success';
     if (!plan.isActive) return 'default';
+    if (dayjs().isAfter(dayjs(plan.endDate))) return 'error';
     if (plan.progressPercentage >= 80) return 'processing';
     return 'active';
   };
@@ -496,6 +478,7 @@ const Plans: React.FC = () => {
   const getStatusText = (plan: StudyPlan) => {
     if (plan.isCompleted) return '已完成';
     if (!plan.isActive) return '已暂停';
+    if (dayjs().isAfter(dayjs(plan.endDate))) return '已逾期';
     return '进行中';
   };
 
@@ -715,7 +698,7 @@ const Plans: React.FC = () => {
                 <Text>{plan.dailyGoal} 分钟</Text>
               </div>
 
-              {plan.milestones && plan.milestones.length > 0 && (
+              {plan.milestones && Array.isArray(plan.milestones) && plan.milestones.length > 0 && (
                 <div style={{ marginTop: 16 }}>
                   <Divider style={{ margin: '12px 0' }} />
                   <Text strong>里程碑：</Text>
@@ -918,8 +901,12 @@ const Plans: React.FC = () => {
                 <Progress 
                   percent={calculateTimeProgress(selectedPlanForMilestones)} 
                   size="small"
-                  status={calculateTimeProgress(selectedPlanForMilestones) === 100 ? 'success' : 'active'}
-                  format={(percent) => `剩余 ${dayjs(selectedPlanForMilestones.endDate).diff(dayjs(), 'day')} 天`}
+                  status={calculateTimeProgress(selectedPlanForMilestones) === 100 ? 'success' : 
+                          dayjs().isAfter(dayjs(selectedPlanForMilestones.endDate)) ? 'exception' : 'active'}
+                  format={(percent) => {
+                    const remainingDays = dayjs(selectedPlanForMilestones.endDate).diff(dayjs(), 'day');
+                    return remainingDays >= 0 ? `剩余 ${remainingDays} 天` : `逾期 ${Math.abs(remainingDays)} 天`;
+                  }}
                 />
                 <Text type="secondary" style={{ fontSize: 12, marginTop: 8 }}>
                   总时长: {dayjs(selectedPlanForMilestones.endDate).diff(dayjs(selectedPlanForMilestones.startDate), 'day')} 天
@@ -929,8 +916,10 @@ const Plans: React.FC = () => {
               <List
               dataSource={selectedPlanForMilestones.milestones}
               renderItem={milestone => {
-                const isOverdue = dayjs().isAfter(milestone.targetDate) && !milestone.isCompleted;
-                const isUpcoming = dayjs().add(7, 'day').isAfter(milestone.targetDate) && !milestone.isCompleted;
+                const now = dayjs();
+                const targetDate = dayjs(milestone.targetDate);
+                const isOverdue = now.isAfter(targetDate) && !milestone.isCompleted;
+                const isUpcoming = !isOverdue && !milestone.isCompleted && targetDate.diff(now, 'day') <= 7 && targetDate.diff(now, 'day') >= 0;
                 
                 return (
                   <List.Item>
@@ -951,7 +940,7 @@ const Plans: React.FC = () => {
                           {isOverdue && (
                             <Tag color="error">已逾期</Tag>
                           )}
-                          {isUpcoming && !milestone.isCompleted && (
+                          {isUpcoming && (
                             <Tag color="orange">即将到期</Tag>
                           )}
                         </div>

@@ -15,7 +15,8 @@ import {
   Space,
   Modal,
   Calendar,
-  Badge
+  Badge,
+  DatePicker
 } from 'antd';
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
@@ -33,7 +34,7 @@ const { TextArea } = Input;
 const { Option } = Select;
 
 interface CheckinRecord {
-  _id: string;
+  id: number;
   content: string;
   studyTime: number;
   subject: string;
@@ -42,21 +43,21 @@ interface CheckinRecord {
   tags: string[] | any;
   createdAt: string;
   user: {
-    _id: string;
+    id: number;
     username: string;
     avatar: string;
   };
   likes: Array<{
     user: {
-      _id: string;
+      id: number;
       username: string;
     };
   }>;
   comments: Array<{
-    _id: string;
+    id: string;
     content: string;
     user: {
-      _id: string;
+      id: number;
       username: string;
     };
     createdAt: string;
@@ -73,6 +74,8 @@ const Checkin: React.FC = () => {
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [lastCheckinData, setLastCheckinData] = useState<any>(null);
   const [userSubjects, setUserSubjects] = useState<string[]>([]);
+  const [isBackfillMode, setIsBackfillMode] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs | null>(null);
   // 日历弹窗状态
   const [calendarModal, setCalendarModal] = useState<{ visible: boolean, date: string, items: CheckinRecord[] }>({ visible: false, date: '', items: [] });
   // 日历数据分组
@@ -148,55 +151,9 @@ const Checkin: React.FC = () => {
   }, [user?.id]);
 
   useEffect(() => {
-    if (user?.id === 'demo-user') {
-      // 演示模式，使用模拟数据
-      const demoCheckins: CheckinRecord[] = [
-        {
-          _id: '1',
-          content: '今天学习了React Hooks，感觉对状态管理有了更深的理解！',
-          studyTime: 120,
-          subject: '编程',
-          mood: 'happy',
-          location: '图书馆',
-          tags: ['React', '前端开发'],
-          createdAt: new Date().toISOString(),
-          user: { _id: 'demo-user', username: '演示用户', avatar: '' },
-          likes: [{ user: { _id: 'user1', username: '小明' } }],
-          comments: [{ _id: '1', content: '加油！', user: { _id: 'user1', username: '小明' }, createdAt: new Date().toISOString() }]
-        },
-        {
-          _id: '2',
-          content: '完成了数学作业，解出了几道难题，很有成就感！',
-          studyTime: 90,
-          subject: '数学',
-          mood: 'excited',
-          location: '宿舍',
-          tags: ['微积分', '作业'],
-          createdAt: new Date(Date.now() - 86400000).toISOString(),
-          user: { _id: 'demo-user', username: '演示用户', avatar: '' },
-          likes: [],
-          comments: []
-        },
-        {
-          _id: '3',
-          content: '英语阅读练习，今天读了一篇关于AI的文章，学到了很多新词汇！',
-          studyTime: 60,
-          subject: '英语',
-          mood: 'normal',
-          location: '咖啡厅',
-          tags: ['阅读', 'AI'],
-          createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
-          user: { _id: 'user2', username: '小红', avatar: '' },
-          likes: [{ user: { _id: 'demo-user', username: '演示用户' } }],
-          comments: []
-        }
-      ];
-
-      setCheckins(demoCheckins);
-    } else if (user?.id) {
+    if (user?.id) {
       fetchCheckins();
       fetchUserPlans();
-      // 不再检查今日是否已打卡，始终允许打卡
     }
   }, [user, fetchCheckins]);
 
@@ -216,7 +173,9 @@ const Checkin: React.FC = () => {
         mood: values.mood || 'normal',
         location: values.location || '',
         tags: values.tags || [],
-        isPublic: values.isPublic !== undefined ? !!values.isPublic : true
+        isPublic: values.isPublic !== undefined ? !!values.isPublic : true,
+        // 如果是补卡模式，添加学习日期
+        ...(isBackfillMode && selectedDate && { studyDate: selectedDate.format('YYYY-MM-DD') })
       };
       
       console.log('处理后的打卡数据:', submitData);
@@ -232,15 +191,23 @@ const Checkin: React.FC = () => {
 
       // 重置表单
       form.resetFields();
+      
+      // 重置补卡模式
+      setIsBackfillMode(false);
+      setSelectedDate(null);
 
       // 刷新打卡记录
       fetchCheckins();
       // 刷新用户科目列表（以防添加了新科目）
       fetchUserPlans();
-      // 不再设置 hasCheckedInToday，始终允许打卡
 
       // 显示成功模态框
       setSuccessModalVisible(true);
+      
+      // 延迟刷新页面以确保日历立即更新
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
 
     } catch (error: any) {
       console.error('打卡失败:', error);
@@ -279,13 +246,58 @@ const Checkin: React.FC = () => {
         <Row gutter={[32, 32]} justify="center">
           {/* 左侧：新增打卡表单 */}
           <Col xs={24} lg={8}>
-            <Card title="今日打卡" bordered={false} style={{ borderRadius: 16, boxShadow: '0 4px 24px #bdbdbd30', background: '#fff' }}>
+            <Card title={isBackfillMode ? "补卡" : "今日打卡"} bordered={false} style={{ borderRadius: 16, boxShadow: '0 4px 24px #bdbdbd30', background: '#fff' }}>
               <Form
                 form={form}
                 layout="vertical"
                 onFinish={onFinish}
                 size="large"
               >
+                {/* 补卡模式切换 */}
+                <Form.Item>
+                  <Space>
+                    <Button 
+                      type={isBackfillMode ? "default" : "primary"}
+                      onClick={() => {
+                        setIsBackfillMode(false);
+                        setSelectedDate(null);
+                        form.resetFields();
+                      }}
+                    >
+                      今日打卡
+                    </Button>
+                    <Button 
+                      type={isBackfillMode ? "primary" : "default"}
+                      onClick={() => {
+                        setIsBackfillMode(true);
+                        setSelectedDate(dayjs().subtract(1, 'day'));
+                      }}
+                    >
+                      补卡
+                    </Button>
+                  </Space>
+                </Form.Item>
+
+                {/* 补卡日期选择 */}
+                {isBackfillMode && (
+                  <Form.Item
+                    name="studyDate"
+                    label="学习日期"
+                    rules={[{ required: true, message: '请选择学习日期' }]}
+                    initialValue={dayjs().subtract(1, 'day')}
+                  >
+                    <DatePicker
+                      style={{ width: '100%' }}
+                      placeholder="选择学习日期"
+                      disabledDate={(current) => {
+                        // 不能选择未来日期
+                        return current && current > dayjs().endOf('day');
+                      }}
+                      onChange={(date) => setSelectedDate(date)}
+                    />
+                  </Form.Item>
+                )}
+
                 <Form.Item
                   name="content"
                   label="学习内容"

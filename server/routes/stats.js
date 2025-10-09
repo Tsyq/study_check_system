@@ -1,8 +1,7 @@
 const express = require('express');
-const User = require('../models/User');
-const Checkin = require('../models/Checkin');
-const StudyPlan = require('../models/StudyPlan');
+const { User, Checkin, StudyPlan } = require('../models');
 const { authenticateToken, optionalAuth } = require('../middleware/auth');
+const { Op, fn, col, literal } = require('sequelize');
 
 const router = express.Router();
 
@@ -10,56 +9,43 @@ const router = express.Router();
 router.get('/leaderboard/study-time', optionalAuth, async (req, res) => {
   try {
     const { period = '30', limit = 50 } = req.query;
+    const numericLimit = parseInt(limit);
 
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - parseInt(period));
 
-    const leaderboard = await Checkin.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startDate },
-          isPublic: true
-        }
-      },
-      {
-        $group: {
-          _id: '$user',
-          totalStudyTime: { $sum: '$studyTime' },
-          checkinCount: { $sum: 1 },
-          subjects: { $addToSet: '$subject' }
-        }
-      },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'userInfo'
-        }
-      },
-      {
-        $unwind: '$userInfo'
-      },
-      {
-        $project: {
-          userId: '$_id',
-          username: '$userInfo.username',
-          avatar: '$userInfo.avatar',
-          totalStudyTime: 1,
-          checkinCount: 1,
-          subjects: 1,
-          streak: '$userInfo.streak'
-        }
-      },
-      {
-        $sort: { totalStudyTime: -1 }
-      },
-      {
-        $limit: parseInt(limit)
-      }
-    ]);
+    // 使用原生SQL查询避免GROUP BY问题
+    const leaderboard = await Checkin.sequelize.query(`
+      SELECT 
+        c.user_id,
+        SUM(c.study_time) as totalStudyTime,
+        COUNT(c.id) as checkinCount,
+        GROUP_CONCAT(DISTINCT c.subject) as subjects,
+        u.username,
+        u.avatar,
+        u.streak
+      FROM checkins c
+      LEFT JOIN users u ON c.user_id = u.id
+      WHERE c.created_at >= :startDate AND c.is_public = 1
+      GROUP BY c.user_id, u.username, u.avatar, u.streak
+      ORDER BY totalStudyTime DESC
+      LIMIT :limit
+    `, {
+      replacements: { startDate, limit: numericLimit },
+      type: Checkin.sequelize.QueryTypes.SELECT
+    });
 
-    res.json({ leaderboard });
+    const formattedLeaderboard = leaderboard.map(item => ({
+      userId: item.user_id,
+      username: item.username || '未知用户',
+      avatar: item.avatar || '',
+      totalStudyTime: parseInt(item.totalStudyTime) || 0,
+      checkinCount: parseInt(item.checkinCount) || 0,
+      subjects: item.subjects ? item.subjects.split(',') : [],
+      streak: item.streak || 0
+    }));
+
+    res.json({ leaderboard: formattedLeaderboard });
   } catch (error) {
     console.error('获取学习时长排行榜错误:', error);
     res.status(500).json({ message: '服务器错误' });
@@ -70,78 +56,29 @@ router.get('/leaderboard/study-time', optionalAuth, async (req, res) => {
 router.get('/leaderboard/streak', optionalAuth, async (req, res) => {
   try {
     const { limit = 50 } = req.query;
+    const numericLimit = parseInt(limit);
 
-    const leaderboard = await User.find({
-      isActive: true,
-      streak: { $gt: 0 }
-    })
-      .select('username avatar streak totalStudyTime')
-      .sort({ streak: -1 })
-      .limit(parseInt(limit));
+    const leaderboard = await User.findAll({
+      where: {
+        is_active: true,
+        streak: { [Op.gt]: 0 }
+      },
+      attributes: ['id', 'username', 'avatar', 'streak', 'total_study_time'],
+      order: [['streak', 'DESC']],
+      limit: numericLimit
+    });
 
-    res.json({ leaderboard });
+    const formattedLeaderboard = leaderboard.map(user => ({
+      userId: user.id,
+      username: user.username,
+      avatar: user.avatar,
+      streak: user.streak,
+      totalStudyTime: user.total_study_time
+    }));
+
+    res.json({ leaderboard: formattedLeaderboard });
   } catch (error) {
     console.error('获取连续打卡排行榜错误:', error);
-    res.status(500).json({ message: '服务器错误' });
-  }
-});
-
-// 获取活跃用户排行榜
-router.get('/leaderboard/active', optionalAuth, async (req, res) => {
-  try {
-    const { period = '7', limit = 50 } = req.query;
-
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(period));
-
-    const leaderboard = await Checkin.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startDate },
-          isPublic: true
-        }
-      },
-      {
-        $group: {
-          _id: '$user',
-          checkinCount: { $sum: 1 },
-          totalStudyTime: { $sum: '$studyTime' },
-          avgStudyTime: { $avg: '$studyTime' }
-        }
-      },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'userInfo'
-        }
-      },
-      {
-        $unwind: '$userInfo'
-      },
-      {
-        $project: {
-          userId: '$_id',
-          username: '$userInfo.username',
-          avatar: '$userInfo.avatar',
-          checkinCount: 1,
-          totalStudyTime: 1,
-          avgStudyTime: 1,
-          streak: '$userInfo.streak'
-        }
-      },
-      {
-        $sort: { checkinCount: -1, totalStudyTime: -1 }
-      },
-      {
-        $limit: parseInt(limit)
-      }
-    ]);
-
-    res.json({ leaderboard });
-  } catch (error) {
-    console.error('获取活跃用户排行榜错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
 });
@@ -151,300 +88,162 @@ router.get('/personal/:userId', optionalAuth, async (req, res) => {
   try {
     const { userId } = req.params;
     const { period = '30' } = req.query;
+    const numericUserId = parseInt(userId);
+
+    if (isNaN(numericUserId)) {
+      return res.status(400).json({ message: '无效的用户ID' });
+    }
 
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - parseInt(period));
 
     // 基础用户信息
-    const user = await User.findById(userId).select('-password');
+    const user = await User.findByPk(numericUserId, {
+      attributes: { exclude: ['password'] }
+    });
     if (!user) {
       return res.status(404).json({ message: '用户不存在' });
     }
 
     // 学习统计
-    const studyStats = await Checkin.aggregate([
-      {
-        $match: {
-          user: require('mongoose').Types.ObjectId(userId),
-          createdAt: { $gte: startDate }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalStudyTime: { $sum: '$studyTime' },
-          totalCheckins: { $sum: 1 },
-          avgStudyTime: { $avg: '$studyTime' },
-          subjects: { $addToSet: '$subject' }
-        }
+    const studyStats = await Checkin.findOne({
+      attributes: [
+        [fn('SUM', col('study_time')), 'totalStudyTime'],
+        [fn('COUNT', col('id')), 'totalCheckins'],
+        [fn('AVG', col('study_time')), 'avgStudyTime'],
+        [fn('GROUP_CONCAT', col('subject')), 'subjects']
+      ],
+      where: {
+        user_id: numericUserId,
+        created_at: { [Op.gte]: startDate }
       }
-    ]);
+    });
+
+    // 获取打卡记录用于情绪分析
+    const checkins = await Checkin.findAll({
+      attributes: ['mood', 'content'],
+      where: {
+        user_id: numericUserId,
+        created_at: { [Op.gte]: startDate }
+      }
+    });
 
     // 按日期统计学习时长
-    const dailyStats = await Checkin.aggregate([
-      {
-        $match: {
-          user: require('mongoose').Types.ObjectId(userId),
-          createdAt: { $gte: startDate }
-        }
+    const dailyStats = await Checkin.findAll({
+      attributes: [
+        [fn('YEAR', col('created_at')), 'year'],
+        [fn('MONTH', col('created_at')), 'month'],
+        [fn('DAY', col('created_at')), 'day'],
+        [fn('SUM', col('study_time')), 'studyTime'],
+        [fn('COUNT', col('id')), 'checkins']
+      ],
+      where: {
+        user_id: numericUserId,
+        created_at: { [Op.gte]: startDate }
       },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' },
-            day: { $dayOfMonth: '$createdAt' }
-          },
-          studyTime: { $sum: '$studyTime' },
-          checkins: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 }
-      }
-    ]);
+      group: [
+        fn('YEAR', col('created_at')),
+        fn('MONTH', col('created_at')),
+        fn('DAY', col('created_at'))
+      ],
+      order: [
+        [fn('YEAR', col('created_at')), 'ASC'],
+        [fn('MONTH', col('created_at')), 'ASC'],
+        [fn('DAY', col('created_at')), 'ASC']
+      ]
+    });
 
     // 按科目统计
-    const subjectStats = await Checkin.aggregate([
-      {
-        $match: {
-          user: require('mongoose').Types.ObjectId(userId),
-          createdAt: { $gte: startDate }
-        }
+    const subjectStats = await Checkin.findAll({
+      attributes: [
+        'subject',
+        [fn('SUM', col('study_time')), 'totalTime'],
+        [fn('COUNT', col('id')), 'checkinCount'],
+        [fn('AVG', col('study_time')), 'avgTime']
+      ],
+      where: {
+        user_id: numericUserId,
+        created_at: { [Op.gte]: startDate }
       },
-      {
-        $group: {
-          _id: '$subject',
-          totalTime: { $sum: '$studyTime' },
-          checkinCount: { $sum: 1 },
-          avgTime: { $avg: '$studyTime' }
-        }
-      },
-      {
-        $sort: { totalTime: -1 }
-      }
-    ]);
+      group: ['subject'],
+      order: [[fn('SUM', col('study_time')), 'DESC']]
+    });
 
     // 学习计划统计
-    const planStats = await StudyPlan.aggregate([
-      {
-        $match: { user: require('mongoose').Types.ObjectId(userId) }
+    const planStats = await StudyPlan.findOne({
+      attributes: [
+        [fn('COUNT', col('id')), 'totalPlans'],
+        [fn('SUM', literal('CASE WHEN is_active = 1 AND is_completed = 0 THEN 1 ELSE 0 END')), 'activePlans'],
+        [fn('SUM', literal('CASE WHEN is_completed = 1 THEN 1 ELSE 0 END')), 'completedPlans'],
+        [fn('SUM', col('total_hours')), 'totalTargetHours'],
+        [fn('SUM', col('completed_hours')), 'totalCompletedHours']
+      ],
+      where: { user_id: numericUserId }
+    });
+
+    // 格式化数据
+    const formattedDailyStats = dailyStats.map(item => ({
+      _id: {
+        year: parseInt(item.dataValues.year),
+        month: parseInt(item.dataValues.month),
+        day: parseInt(item.dataValues.day)
       },
-      {
-        $group: {
-          _id: null,
-          totalPlans: { $sum: 1 },
-          activePlans: {
-            $sum: { $cond: [{ $and: ['$isActive', { $not: '$isCompleted' }] }, 1, 0] }
-          },
-          completedPlans: {
-            $sum: { $cond: ['$isCompleted', 1, 0] }
-          },
-          totalTargetHours: { $sum: '$totalHours' },
-          totalCompletedHours: { $sum: '$completedHours' }
-        }
-      }
-    ]);
+      studyTime: parseInt(item.dataValues.studyTime) || 0,
+      checkins: parseInt(item.dataValues.checkins) || 0
+    }));
+
+    const formattedSubjectStats = subjectStats.map(item => ({
+      _id: item.subject,
+      totalTime: parseInt(item.dataValues.totalTime) || 0,
+      checkinCount: parseInt(item.dataValues.checkinCount) || 0,
+      avgTime: parseFloat(item.dataValues.avgTime) || 0
+    }));
+
+    const studyStatsData = studyStats ? {
+      totalStudyTime: parseInt(studyStats.dataValues.totalStudyTime) || 0,
+      totalCheckins: parseInt(studyStats.dataValues.totalCheckins) || 0,
+      avgStudyTime: parseFloat(studyStats.dataValues.avgStudyTime) || 0,
+      subjects: studyStats.dataValues.subjects ? studyStats.dataValues.subjects.split(',') : []
+    } : {
+      totalStudyTime: 0,
+      totalCheckins: 0,
+      avgStudyTime: 0,
+      subjects: []
+    };
+
+    const planStatsData = planStats ? {
+      totalPlans: parseInt(planStats.dataValues.totalPlans) || 0,
+      activePlans: parseInt(planStats.dataValues.activePlans) || 0,
+      completedPlans: parseInt(planStats.dataValues.completedPlans) || 0,
+      totalTargetHours: parseFloat(planStats.dataValues.totalTargetHours) || 0,
+      totalCompletedHours: parseFloat(planStats.dataValues.totalCompletedHours) || 0
+    } : {
+      totalPlans: 0,
+      activePlans: 0,
+      completedPlans: 0,
+      totalTargetHours: 0,
+      totalCompletedHours: 0
+    };
 
     res.json({
       user: {
-        id: user._id,
+        id: user.id,
         username: user.username,
         avatar: user.avatar,
         bio: user.bio,
-        totalStudyTime: user.totalStudyTime,
+        totalStudyTime: user.total_study_time,
         streak: user.streak,
-        followers: user.followers.length,
-        following: user.following.length
+        followers: 0, // 需要单独查询关注关系
+        following: 0
       },
-      studyStats: studyStats[0] || {
-        totalStudyTime: 0,
-        totalCheckins: 0,
-        avgStudyTime: 0,
-        subjects: []
-      },
-      dailyStats,
-      subjectStats,
-      planStats: planStats[0] || {
-        totalPlans: 0,
-        activePlans: 0,
-        completedPlans: 0,
-        totalTargetHours: 0,
-        totalCompletedHours: 0
-      }
+      studyStats: studyStatsData,
+      dailyStats: formattedDailyStats,
+      subjectStats: formattedSubjectStats,
+      planStats: planStatsData,
+      checkins: checkins // 添加打卡记录用于情绪分析
     });
   } catch (error) {
     console.error('获取用户个人统计错误:', error);
-    res.status(500).json({ message: '服务器错误' });
-  }
-});
-
-// 获取全局统计
-router.get('/global', async (req, res) => {
-  try {
-    const { period = '30' } = req.query;
-
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(period));
-
-    // 用户统计
-    const userStats = await User.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalUsers: { $sum: 1 },
-          activeUsers: {
-            $sum: { $cond: ['$isActive', 1, 0] }
-          },
-          totalStudyTime: { $sum: '$totalStudyTime' }
-        }
-      }
-    ]);
-
-    // 打卡统计
-    const checkinStats = await Checkin.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startDate },
-          isPublic: true
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalCheckins: { $sum: 1 },
-          totalStudyTime: { $sum: '$studyTime' },
-          avgStudyTime: { $avg: '$studyTime' },
-          uniqueUsers: { $addToSet: '$user' }
-        }
-      }
-    ]);
-
-    // 热门科目
-    const popularSubjects = await Checkin.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startDate },
-          isPublic: true
-        }
-      },
-      {
-        $group: {
-          _id: '$subject',
-          count: { $sum: 1 },
-          totalTime: { $sum: '$studyTime' }
-        }
-      },
-      {
-        $sort: { count: -1 }
-      },
-      {
-        $limit: 10
-      }
-    ]);
-
-    // 学习计划统计
-    const planStats = await StudyPlan.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalPlans: { $sum: 1 },
-          activePlans: {
-            $sum: { $cond: [{ $and: ['$isActive', { $not: '$isCompleted' }] }, 1, 0] }
-          },
-          completedPlans: {
-            $sum: { $cond: ['$isCompleted', 1, 0] }
-          }
-        }
-      }
-    ]);
-
-    res.json({
-      userStats: userStats[0] || {
-        totalUsers: 0,
-        activeUsers: 0,
-        totalStudyTime: 0
-      },
-      checkinStats: checkinStats[0] ? {
-        ...checkinStats[0],
-        uniqueUserCount: checkinStats[0].uniqueUsers.length
-      } : {
-        totalCheckins: 0,
-        totalStudyTime: 0,
-        avgStudyTime: 0,
-        uniqueUserCount: 0
-      },
-      popularSubjects,
-      planStats: planStats[0] || {
-        totalPlans: 0,
-        activePlans: 0,
-        completedPlans: 0
-      }
-    });
-  } catch (error) {
-    console.error('获取全局统计错误:', error);
-    res.status(500).json({ message: '服务器错误' });
-  }
-});
-
-// 获取学习趋势数据
-router.get('/trends', optionalAuth, async (req, res) => {
-  try {
-    const { period = '30', type = 'daily' } = req.query;
-
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(period));
-
-    let groupBy;
-    if (type === 'daily') {
-      groupBy = {
-        year: { $year: '$createdAt' },
-        month: { $month: '$createdAt' },
-        day: { $dayOfMonth: '$createdAt' }
-      };
-    } else if (type === 'weekly') {
-      groupBy = {
-        year: { $year: '$createdAt' },
-        week: { $week: '$createdAt' }
-      };
-    } else {
-      groupBy = {
-        year: { $year: '$createdAt' },
-        month: { $month: '$createdAt' }
-      };
-    }
-
-    const trends = await Checkin.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startDate },
-          isPublic: true
-        }
-      },
-      {
-        $group: {
-          _id: groupBy,
-          totalStudyTime: { $sum: '$studyTime' },
-          checkinCount: { $sum: 1 },
-          uniqueUsers: { $addToSet: '$user' }
-        }
-      },
-      {
-        $project: {
-          date: '$_id',
-          totalStudyTime: 1,
-          checkinCount: 1,
-          uniqueUserCount: { $size: '$uniqueUsers' }
-        }
-      },
-      {
-        $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 }
-      }
-    ]);
-
-    res.json({ trends });
-  } catch (error) {
-    console.error('获取学习趋势错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
 });

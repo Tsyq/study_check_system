@@ -9,11 +9,11 @@ const User = sequelize.define('User', {
     autoIncrement: true
   },
   username: {
-    type: DataTypes.STRING(20),
+    type: DataTypes.STRING(60),
     allowNull: false,
     unique: true,
     validate: {
-      len: [3, 20]
+      len: [2, 60]
     }
   },
   email: {

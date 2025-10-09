@@ -63,6 +63,9 @@ const Checkin = sequelize.define('Checkin', {
   }
 }, {
   tableName: 'checkins',
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
   indexes: [
     {
       fields: ['user_id', 'created_at']

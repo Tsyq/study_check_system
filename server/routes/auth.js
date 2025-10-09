@@ -83,6 +83,12 @@ router.post('/login', async (req, res) => {
     // 生成token
     const token = generateToken(user.id);
 
+    // 获取关注和粉丝数量
+    const [followersCount, followingCount] = await Promise.all([
+      user.countFollowers(),
+      user.countFollowing()
+    ]);
+
     res.json({
       message: '登录成功',
       token,
@@ -94,8 +100,8 @@ router.post('/login', async (req, res) => {
         bio: user.bio,
         totalStudyTime: user.total_study_time,
         streak: user.streak,
-        followers: 0, // 需要单独查询关注关系
-        following: 0
+        followers: followersCount,
+        following: followingCount
       }
     });
   } catch (error) {
@@ -115,6 +121,12 @@ router.get('/me', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: '用户不存在' });
     }
 
+    // 获取关注和粉丝数量
+    const [followersCount, followingCount] = await Promise.all([
+      user.countFollowers(),
+      user.countFollowing()
+    ]);
+
     res.json({
       user: {
         id: user.id,
@@ -126,8 +138,8 @@ router.get('/me', authenticateToken, async (req, res) => {
         totalStudyTime: user.total_study_time,
         streak: user.streak,
         lastCheckinDate: user.last_checkin_date,
-        followers: 0, // 需要单独查询关注关系
-        following: 0,
+        followers: followersCount,
+        following: followingCount,
         role: user.role,
         createdAt: user.created_at
       }

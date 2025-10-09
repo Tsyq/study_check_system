@@ -6,7 +6,8 @@ import {
   TrophyOutlined,
   CalendarOutlined,
   PlusOutlined,
-  RightOutlined
+  RightOutlined,
+  UserAddOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,7 +16,7 @@ import api from '../services/api';
 const { Title, Text } = Typography;
 
 interface Checkin {
-  _id: string;
+  _id: number;
   content: string;
   studyTime: number;
   subject: string;
@@ -49,8 +50,8 @@ const Dashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       const [checkinsResponse, plansResponse] = await Promise.all([
-        api.get('/checkins?limit=5'),
-        api.get('/plans?status=active&limit=3')
+        api.get(`/checkins?userId=${user?.id}&limit=5`),
+        api.get(`/plans?userId=${user?.id}&status=active&limit=3`)
       ]);
 
       setRecentCheckins(checkinsResponse.data.checkins);
@@ -133,7 +134,7 @@ const Dashboard: React.FC = () => {
             <Statistic
               title="正在关注"
               value={user?.following || 0}
-              prefix={<CalendarOutlined />}
+              prefix={<UserAddOutlined />}
               valueStyle={{ color: '#722ed1' }}
             />
           </Card>
@@ -161,10 +162,9 @@ const Dashboard: React.FC = () => {
               renderItem={(item) => (
                 <List.Item>
                   <List.Item.Meta
-                    avatar={<Avatar src={item.user?.avatar || undefined}>{item.user?.username?.[0] || 'U'}</Avatar>}
                     title={
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span>{item.user?.username || '未知用户'}</span>
+                        <span>{item.subject}</span>
                         <Tag color={getMoodColor(item.mood)}>{getMoodText(item.mood)}</Tag>
                       </div>
                     }
@@ -173,7 +173,7 @@ const Dashboard: React.FC = () => {
                         <Text>{item.content}</Text>
                         <br />
                         <Text type="secondary">
-                          {item.subject} · {formatTime(item.studyTime)} · {new Date(item.createdAt).toLocaleDateString()}
+                          {formatTime(item.studyTime)} · {new Date(item.createdAt).toLocaleDateString()}
                         </Text>
                       </div>
                     }

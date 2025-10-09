@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Card, 
   Form, 
@@ -24,7 +24,9 @@ import {
   ClockCircleOutlined,
   FireOutlined,
   TeamOutlined,
-  BookOutlined
+  BookOutlined,
+  TrophyOutlined,
+  UserAddOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
@@ -33,7 +35,7 @@ const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 interface UserProfile {
-  id: string;
+  id: number;
   username: string;
   email: string;
   avatar: string;
@@ -61,56 +63,7 @@ const Profile: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [recentCheckins, setRecentCheckins] = useState<RecentCheckin[]>([]);
 
-  useEffect(() => {
-    if (user?.id === 'demo-user') {
-      // 演示模式，使用模拟数据
-      const demoProfile: UserProfile = {
-        id: 'demo-user',
-        username: '演示用户',
-        email: 'demo@example.com',
-        avatar: '',
-        bio: '这是一个演示账户，用于展示系统功能。你可以在这里看到各种学习统计和打卡记录。',
-        totalStudyTime: 1250,
-        streak: 7,
-        followers: 15,
-        following: 8,
-        createdAt: new Date(Date.now() - 30 * 86400000).toISOString()
-      };
-
-      const demoRecentCheckins: RecentCheckin[] = [
-        {
-          _id: '1',
-          content: '今天学习了React Hooks，感觉对状态管理有了更深的理解！',
-          studyTime: 120,
-          subject: '编程',
-          createdAt: new Date().toISOString()
-        },
-        {
-          _id: '2',
-          content: '完成了数学作业，解出了几道难题，很有成就感！',
-          studyTime: 90,
-          subject: '数学',
-          createdAt: new Date(Date.now() - 86400000).toISOString()
-        },
-        {
-          _id: '3',
-          content: '英语阅读练习，今天读了一篇关于AI的文章，学到了很多新词汇！',
-          studyTime: 60,
-          subject: '英语',
-          createdAt: new Date(Date.now() - 2 * 86400000).toISOString()
-        }
-      ];
-
-      setProfile(demoProfile);
-      setRecentCheckins(demoRecentCheckins);
-      form.setFieldsValue(demoProfile);
-    } else {
-      fetchProfile();
-      fetchRecentCheckins();
-    }
-  }, [user]);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       const response = await api.get('/auth/me');
       setProfile(response.data.user);
@@ -118,16 +71,23 @@ const Profile: React.FC = () => {
     } catch (error) {
       message.error('获取个人信息失败');
     }
-  };
+  }, [form]);
 
-  const fetchRecentCheckins = async () => {
+  const fetchRecentCheckins = useCallback(async () => {
     try {
       const response = await api.get(`/checkins?userId=${user?.id}&limit=5`);
       setRecentCheckins(response.data.checkins);
     } catch (error) {
       console.error('获取最近打卡失败:', error);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchProfile();
+      fetchRecentCheckins();
+    }
+  }, [user?.id, fetchProfile, fetchRecentCheckins]);
 
   const handleEdit = () => {
     setEditing(true);
@@ -307,7 +267,7 @@ const Profile: React.FC = () => {
                 <Statistic
                   title="关注者"
                   value={profile?.followers || 0}
-                  prefix={<TeamOutlined />}
+                  prefix={<TrophyOutlined />}
                   valueStyle={{ color: '#52c41a' }}
                 />
               </Card>
@@ -317,7 +277,7 @@ const Profile: React.FC = () => {
                 <Statistic
                   title="正在关注"
                   value={profile?.following || 0}
-                  prefix={<TeamOutlined />}
+                  prefix={<UserAddOutlined />}
                   valueStyle={{ color: '#722ed1' }}
                 />
               </Card>
