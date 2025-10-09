@@ -50,7 +50,7 @@ const Dashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       const [checkinsResponse, plansResponse] = await Promise.all([
-        api.get('/checkins?limit=5'),
+        api.get(`/checkins?userId=${user?.id}&limit=5`),
         api.get('/plans?status=active&limit=3')
       ]);
 
@@ -162,10 +162,9 @@ const Dashboard: React.FC = () => {
               renderItem={(item) => (
                 <List.Item>
                   <List.Item.Meta
-                    avatar={<Avatar src={item.user?.avatar || undefined}>{item.user?.username?.[0] || 'U'}</Avatar>}
                     title={
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span>{item.user?.username || '未知用户'}</span>
+                        <span>{item.subject}</span>
                         <Tag color={getMoodColor(item.mood)}>{getMoodText(item.mood)}</Tag>
                       </div>
                     }
@@ -174,7 +173,7 @@ const Dashboard: React.FC = () => {
                         <Text>{item.content}</Text>
                         <br />
                         <Text type="secondary">
-                          {item.subject} · {formatTime(item.studyTime)} · {new Date(item.createdAt).toLocaleDateString()}
+                          {formatTime(item.studyTime)} · {new Date(item.createdAt).toLocaleDateString()}
                         </Text>
                       </div>
                     }

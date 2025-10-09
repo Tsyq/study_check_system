@@ -106,6 +106,30 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
+// 获取单个打卡详情
+router.get('/:id', optionalAuth, async (req, res) => {
+  try {
+    const checkin = await Checkin.findOne({ 
+      where: { id: req.params.id },
+      include: [{ model: User, as: 'user', attributes: ['id', 'username', 'avatar'] }]
+    });
+    
+    if (!checkin) {
+      return res.status(404).json({ message: '打卡记录不存在' });
+    }
+
+    // 检查权限：只有公开的打卡或者自己的打卡才能查看
+    if (!checkin.is_public && (!req.user || checkin.user_id !== req.user.id)) {
+      return res.status(403).json({ message: '无权限查看此打卡记录' });
+    }
+
+    return res.json({ checkin: mapCheckin(checkin) });
+  } catch (error) {
+    console.error('获取打卡详情错误:', error);
+    res.status(500).json({ message: '服务器错误' });
+  }
+});
+
 // 点赞/取消点赞
 router.post('/:id/like', authenticateToken, async (req, res) => {
   try {

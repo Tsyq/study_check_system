@@ -28,7 +28,8 @@ import {
   TrophyOutlined,
   UserOutlined,
   CalendarOutlined,
-  TeamOutlined
+  TeamOutlined,
+  FileTextOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
@@ -74,16 +75,18 @@ interface UserBrief {
 const Social: React.FC = () => {
   const { user, updateUser } = useAuth() as any;
   const location = useLocation() as { state?: { activeTab?: string; openMessages?: boolean } };
-  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'feed');
+  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'my-dynamics');
   const [messageTabKey, setMessageTabKey] = useState('likes');
   const [feedCheckins, setFeedCheckins] = useState<Checkin[]>([]);
   const [allCheckins, setAllCheckins] = useState<Checkin[]>([]);
+  const [myCheckins, setMyCheckins] = useState<Checkin[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [myFollowing, setMyFollowing] = useState<any[]>([]);
   const [myFollowers, setMyFollowers] = useState<any[]>([]);
   const [receivedItems, setReceivedItems] = useState<any[]>([]);
+  const [checkinDetails, setCheckinDetails] = useState<Record<string, any>>({});
   const [discoverUsers, setDiscoverUsers] = useState<any[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState<Record<string, string>>({});
@@ -200,16 +203,26 @@ const Social: React.FC = () => {
 
       setFeedCheckins(demoCheckins);
       setAllCheckins(demoCheckins);
+      setMyCheckins(demoCheckins.filter(c => c.user._id === 'demo-user')); // 只显示当前用户的动态
       setMyFollowing(demoFollowing);
       setMyFollowers(demoFollowers);
       setReceivedItems(demoReceivedItems);
       setFollowingIds(new Set(demoFollowing.map(u => u._id)));
+      
+      // 为演示数据添加动态详情
+      setCheckinDetails({
+        '1': { content: '今天学习了React，完成了组件开发，感觉很有成就感！', subject: '编程', studyTime: 120 },
+        '2': { content: '完成了数学作业，解出了几道难题，很有成就感！', subject: '数学', studyTime: 90 }
+      });
+      
       setLoading(false);
     } else {
       // 同步关注ID集合和粉丝数据
       fetchFollowingIds();
       fetchFollowers();
-      if (activeTab === 'feed') {
+      if (activeTab === 'my-dynamics') {
+        fetchMyCheckins();
+      } else if (activeTab === 'feed') {
         fetchFeed();
       } else if (activeTab === 'discover') {
         fetchAllCheckins();
@@ -228,6 +241,25 @@ const Social: React.FC = () => {
       setMessageTabKey('likes');
     }
   }, [location.state]);
+
+  // 获取消息中动态的详情
+  useEffect(() => {
+    console.log('useEffect触发 - receivedItems:', receivedItems, 'demoMode:', user?.demoMode);
+    if (receivedItems.length > 0) {
+      receivedItems.forEach(item => {
+        console.log('处理消息项:', item);
+        if (item.checkinId && !checkinDetails[item.checkinId]) {
+          console.log('需要获取动态详情:', item.checkinId);
+          if (user?.demoMode) {
+            // 在demo模式下，动态详情已经在初始化时设置了
+            console.log('demo模式，跳过API调用');
+          } else {
+            fetchCheckinDetails(item.checkinId);
+          }
+        }
+      });
+    }
+  }, [receivedItems, user?.demoMode]);
 
   const fetchFeed = async () => {
     setLoading(true);
@@ -249,6 +281,18 @@ const Social: React.FC = () => {
       setAllCheckins(response.data.checkins);
     } catch (error) {
       message.error('获取打卡动态失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMyCheckins = async () => {
+    setLoading(true);
+    try {
+      const response = await api.get(`/checkins?userId=${user?.id}&limit=50`);
+      setMyCheckins(response.data.checkins || []);
+    } catch (error) {
+      console.error('获取我的动态失败:', error);
     } finally {
       setLoading(false);
     }
@@ -302,8 +346,10 @@ const Social: React.FC = () => {
   const fetchReceived = async () => {
     try {
       const response = await api.get(`/social/me/received?limit=50`);
+      console.log('收到的消息数据:', response.data);
       setReceivedItems(response.data.items || []);
     } catch (e) {
+      console.error('获取收到的互动失败:', e);
       message.error('获取收到的互动失败');
     }
   };
@@ -362,6 +408,30 @@ const Social: React.FC = () => {
     setUserCheckins([]);
   };
 
+  const fetchCheckinDetails = async (checkinId: string) => {
+    if (checkinDetails[checkinId]) return checkinDetails[checkinId];
+    
+    console.log('正在获取动态详情:', checkinId);
+    try {
+      const response = await api.get(`/checkins/${checkinId}`);
+      console.log('动态详情响应:', response.data);
+      const checkin = response.data.checkin;
+      const detail = {
+        content: checkin.content,
+        subject: checkin.subject,
+        studyTime: checkin.studyTime
+      };
+      console.log('处理后的动态详情:', detail);
+      setCheckinDetails(prev => ({ ...prev, [checkinId]: detail }));
+      return detail;
+    } catch (error) {
+      console.error('获取动态详情失败:', error);
+      const fallbackDetail = { content: '动态内容获取失败', subject: '', studyTime: 0 };
+      setCheckinDetails(prev => ({ ...prev, [checkinId]: fallbackDetail }));
+      return fallbackDetail;
+    }
+  };
+
   const handleFollow = async (userId: string) => {
     try {
       await api.post(`/social/follow/${userId}`);
@@ -397,6 +467,8 @@ const Social: React.FC = () => {
       await api.post(`/checkins/${checkinId}/like`);
       if (activeTab === 'feed') {
         fetchFeed();
+      } else if (activeTab === 'my-dynamics') {
+        fetchMyCheckins();
       } else {
         fetchAllCheckins();
       }
@@ -413,6 +485,8 @@ const Social: React.FC = () => {
       setCommentText(prev => ({ ...prev, [checkinId]: '' }));
       if (activeTab === 'feed') {
         fetchFeed();
+      } else if (activeTab === 'my-dynamics') {
+        fetchMyCheckins();
       } else {
         fetchAllCheckins();
       }
@@ -469,6 +543,59 @@ const Social: React.FC = () => {
 
   const isLiked = (checkin: Checkin) => {
     return checkin.likes.some(like => like.user._id === user?.id);
+  };
+
+  const renderMessageItem = (it: any) => {
+    console.log('渲染消息项:', it, 'checkinDetails:', checkinDetails);
+    const detail = checkinDetails[it.checkinId];
+    const content = detail?.content || '动态内容加载中...';
+    const subject = detail?.subject || '';
+    const studyTime = detail?.studyTime || 0;
+    
+    return (
+      <List.Item>
+        <div style={{ width: '100%' }}>
+          <Space style={{ marginBottom: 8 }}>
+            <Avatar>{it.fromUser?.username?.[0] || 'U'}</Avatar>
+            <Text strong>{it.fromUser?.username || '用户'}</Text>
+            <Text type="secondary">
+              {it.type === 'like' ? '点赞了你的打卡' : '评论了你的打卡'}
+            </Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {new Date(it.createdAt).toLocaleString()}
+            </Text>
+          </Space>
+          
+          <div style={{ 
+            background: '#f5f5f5', 
+            padding: 12, 
+            borderRadius: 8, 
+            marginLeft: 40,
+            border: '1px solid #e8e8e8'
+          }}>
+            <div style={{ marginBottom: 8 }}>
+              <Text strong style={{ color: '#1890ff' }}>{subject}</Text>
+              <Text type="secondary" style={{ marginLeft: 8 }}>
+                <ClockCircleOutlined /> {studyTime}分钟
+              </Text>
+            </div>
+            <Text>{content}</Text>
+            {it.type === 'comment' && it.content && (
+              <div style={{ 
+                marginTop: 8, 
+                padding: 8, 
+                background: '#fff', 
+                borderRadius: 4,
+                border: '1px solid #d9d9d9'
+              }}>
+                <Text type="secondary">评论：</Text>
+                <Text>{it.content}</Text>
+              </div>
+            )}
+          </div>
+        </div>
+      </List.Item>
+    );
   };
 
   const renderCheckinItem = (item: Checkin) => (
@@ -596,6 +723,36 @@ const Social: React.FC = () => {
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
         }}
       >
+        <TabPane 
+          tab={
+            <span>
+              <FileTextOutlined style={{ marginRight: 4 }} />
+              我的动态
+            </span>
+          } 
+          key="my-dynamics"
+        >
+          <div style={{ padding: '16px 0' }}>
+            <List
+              dataSource={myCheckins}
+              loading={loading}
+              renderItem={renderCheckinItem}
+              locale={{ 
+                emptyText: (
+                  <Empty 
+                    description="还没有发布任何动态，去打卡分享你的学习成果吧！"
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  >
+                    <Button type="primary" onClick={() => window.location.href = '/checkin'}>
+                      去打卡
+                    </Button>
+                  </Empty>
+                )
+              }}
+            />
+          </div>
+        </TabPane>
+
         <TabPane 
           tab={
             <span>
@@ -815,15 +972,7 @@ const Social: React.FC = () => {
                   <List
                     dataSource={receivedItems.filter((it: any) => it.type === 'like')}
                     locale={{ emptyText: <Empty description="暂无点赞消息" /> }}
-                    renderItem={(it: any) => (
-                      <List.Item>
-                        <Space>
-                          <Avatar>{it.fromUser?.username?.[0] || 'U'}</Avatar>
-                          <Text>{it.fromUser?.username || '用户'} 点赞了你的打卡</Text>
-                          <Text type="secondary">{new Date(it.createdAt).toLocaleString()}</Text>
-                        </Space>
-                      </List.Item>
-                    )}
+                    renderItem={renderMessageItem}
                   />
                 </TabPane>
                 <TabPane 
@@ -838,15 +987,7 @@ const Social: React.FC = () => {
                   <List
                     dataSource={receivedItems.filter((it: any) => it.type === 'comment')}
                     locale={{ emptyText: <Empty description="暂无回复" /> }}
-                    renderItem={(it: any) => (
-                      <List.Item>
-                        <Space>
-                          <Avatar>{it.fromUser?.username?.[0] || 'U'}</Avatar>
-                          <Text>{it.fromUser?.username || '用户'} 评论：{it.content || ''}</Text>
-                          <Text type="secondary">{new Date(it.createdAt).toLocaleString()}</Text>
-                        </Space>
-                      </List.Item>
-                    )}
+                    renderItem={renderMessageItem}
                   />
                 </TabPane>
               </Tabs>
@@ -877,7 +1018,11 @@ const Social: React.FC = () => {
         footer={null}
         width={900}
         style={{ top: 20 }}
-        bodyStyle={{ padding: '24px' }}
+        bodyStyle={{ 
+          padding: '24px',
+          background: 'linear-gradient(135deg, #e0e7ff 0%, #f0fdfa 100%)',
+          borderRadius: '12px'
+        }}
       >
         <Spin spinning={userModalLoading}>
           {selectedUser && (
