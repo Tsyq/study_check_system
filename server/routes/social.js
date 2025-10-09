@@ -227,7 +227,7 @@ router.get('/feed', authenticateToken, async (req, res) => {
       comments: Array.isArray(c.comments) ? c.comments.map(cm => ({ _id: cm.id || '', content: cm.content, user: idToUser.get(cm.user_id) || { _id: cm.user_id }, createdAt: cm.created_at })) : [],
       isPublic: c.is_public,
       tags: Array.isArray(c.tags) ? c.tags : [],
-      createdAt: c.createdAt,
+      createdAt: c.created_at,
       user: c.user ? { _id: c.user.id, username: c.user.username, avatar: c.user.avatar } : null
     }));
 
@@ -343,7 +343,7 @@ router.get('/users/:userId', optionalAuth, async (req, res) => {
       comments: c.comments || [],
       isPublic: c.is_public,
       tags: Array.isArray(c.tags) ? c.tags : [],
-      createdAt: c.createdAt,
+      createdAt: c.created_at,
       user: c.user ? { _id: c.user.id, username: c.user.username, avatar: c.user.avatar } : null
     }));
 
