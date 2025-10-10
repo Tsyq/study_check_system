@@ -55,6 +55,8 @@ const Profile: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [fileSizeModalVisible, setFileSizeModalVisible] = useState(false);
+  const [fileSizeInfo, setFileSizeInfo] = useState({ name: '', size: 0 });
   const [passwordLoading, setPasswordLoading] = useState(false);
 
   const fetchProfile = useCallback(async () => {
@@ -118,19 +120,78 @@ const Profile: React.FC = () => {
     setPasswordModalVisible(true);
   };
 
+  // 图片压缩函数
+  const compressImage = (file: File, maxWidth: number = 200, quality: number = 0.8): Promise<File> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        // 计算压缩后的尺寸
+        let { width, height } = img;
+        if (width > height) {
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxWidth) {
+            width = (width * maxWidth) / height;
+            height = maxWidth;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        // 绘制压缩后的图片
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // 转换为 Blob
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now()
+            });
+            resolve(compressedFile);
+          } else {
+            resolve(file);
+          }
+        }, 'image/jpeg', quality);
+      };
+      
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const handleAvatarChange = (info: any) => {
+    console.log('头像上传状态变化:', {
+      status: info.file?.status,
+      name: info.file?.name,
+      percent: info.file?.percent,
+      response: info.file?.response,
+      error: info.file?.error
+    });
+    
     if (info.file.status === 'uploading') {
+      console.log('上传进度:', info.file.percent + '%');
       return;
     }
     if (info.file.status === 'done') {
       message.success('头像上传成功');
+      console.log('上传响应:', info.file.response);
       // 更新本地头像显示
       if (info.file.response && info.file.response.avatarUrl) {
         setProfile(prev => prev ? { ...prev, avatar: info.file.response.avatarUrl } : null);
       }
       fetchProfile(); // 重新获取用户信息
     } else if (info.file.status === 'error') {
-      message.error('头像上传失败');
+      console.error('头像上传失败:', info.file.error);
+      message.error('头像上传失败: ' + (info.file.error?.message || '未知错误'));
+    } else {
+      console.log('未知状态:', info.file.status);
     }
   };
 
@@ -153,17 +214,67 @@ const Profile: React.FC = () => {
                 }}
                 onChange={handleAvatarChange}
                 disabled={!editing}
-                beforeUpload={(file) => {
+                beforeUpload={async (file) => {
+                  console.log('beforeUpload 检查文件:', {
+                    name: file.name,
+                    type: file.type,
+                    size: file.size,
+                    sizeMB: (file.size / 1024 / 1024).toFixed(2)
+                  });
+                  
                   const isImage = file.type.startsWith('image/');
                   if (!isImage) {
+                    console.log('文件类型检查失败:', file.type);
                     message.error('只能上传图片文件!');
                     return false;
                   }
-                  const isLt5M = file.size / 1024 / 1024 < 5;
-                  if (!isLt5M) {
-                    message.error('图片大小不能超过5MB!');
+                  
+                  // 如果文件大于2MB，自动压缩
+                  if (file.size > 2 * 1024 * 1024) {
+                    console.log('文件较大，开始压缩...');
+                    try {
+                      const compressedFile = await compressImage(file, 200, 0.8);
+                      console.log('压缩完成:', {
+                        原始大小: (file.size / 1024 / 1024).toFixed(2) + 'MB',
+                        压缩后大小: (compressedFile.size / 1024 / 1024).toFixed(2) + 'MB'
+                      });
+                      
+                      // 替换原始文件，保持uid属性
+                      const fileWithUid = Object.assign(compressedFile, {
+                        uid: file.uid
+                      });
+                      
+                      // 如果压缩后仍然太大，显示提醒
+                      if (compressedFile.size > 10 * 1024 * 1024) {
+                        setFileSizeInfo({
+                          name: file.name,
+                          size: compressedFile.size
+                        });
+                        setFileSizeModalVisible(true);
+                        return false;
+                      }
+                      
+                      return fileWithUid;
+                    } catch (error) {
+                      console.error('图片压缩失败:', error);
+                      message.error('图片压缩失败，请选择较小的图片');
+                      return false;
+                    }
+                  }
+                  
+                  // 检查文件大小限制
+                  const isLt10M = file.size / 1024 / 1024 < 10;
+                  if (!isLt10M) {
+                    console.log('文件大小检查失败:', (file.size / 1024 / 1024).toFixed(2) + 'MB');
+                    setFileSizeInfo({
+                      name: file.name,
+                      size: file.size
+                    });
+                    setFileSizeModalVisible(true);
                     return false;
                   }
+                  
+                  console.log('文件检查通过，开始上传');
                   return true;
                 }}
               >
@@ -371,9 +482,52 @@ const Profile: React.FC = () => {
             </Space>
           </Form.Item>
         </Form>
-      </Modal>
-    </div>
-  );
-};
+        </Modal>
 
-export default Profile;
+        {/* 文件大小提醒弹窗 */}
+        <Modal
+          title="文件大小超出限制"
+          open={fileSizeModalVisible}
+          onCancel={() => setFileSizeModalVisible(false)}
+          footer={[
+            <Button key="ok" type="primary" onClick={() => setFileSizeModalVisible(false)}>
+              我知道了
+            </Button>
+          ]}
+          width={500}
+        >
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <div style={{ fontSize: 48, color: '#ff4d4f', marginBottom: 16 }}>
+              📁
+            </div>
+            <h3 style={{ color: '#ff4d4f', marginBottom: 16 }}>
+              文件过大，无法上传
+            </h3>
+            <div style={{ marginBottom: 16 }}>
+              <p><strong>文件名：</strong>{fileSizeInfo.name}</p>
+              <p><strong>文件大小：</strong>{(fileSizeInfo.size / 1024 / 1024).toFixed(2)} MB</p>
+              <p><strong>限制大小：</strong>10 MB</p>
+            </div>
+            <div style={{ 
+              background: '#f6ffed', 
+              border: '1px solid #b7eb8f', 
+              borderRadius: 6, 
+              padding: 16,
+              marginTop: 20
+            }}>
+              <h4 style={{ color: '#52c41a', marginBottom: 8 }}>💡 建议解决方案：</h4>
+              <ul style={{ textAlign: 'left', margin: 0, paddingLeft: 20 }}>
+                <li><strong>自动压缩：</strong>系统会自动压缩大于2MB的图片</li>
+                <li>使用图片编辑软件进一步压缩</li>
+                <li>调整图片尺寸（建议 200x200 像素）</li>
+                <li>选择其他较小的图片文件</li>
+                <li>使用在线图片压缩工具</li>
+              </ul>
+            </div>
+          </div>
+        </Modal>
+      </div>
+    );
+  };
+
+  export default Profile;
