@@ -57,6 +57,9 @@ router.post('/avatar', authenticateToken, upload.single('avatar'), async (req, r
     const filename = req.file.filename;
     const avatarUrl = `/uploads/avatars/${filename}`;
 
+    // 先删除旧头像文件
+    await deleteOldAvatar(userId);
+
     // 更新用户头像
     await User.update(
       { avatar: avatarUrl },
@@ -82,11 +85,13 @@ const deleteOldAvatar = async (userId) => {
       const oldAvatarPath = path.join(__dirname, '../', user.avatar);
       if (fs.existsSync(oldAvatarPath)) {
         fs.unlinkSync(oldAvatarPath);
+        console.log(`已删除旧头像文件: ${oldAvatarPath}`);
       }
     }
   } catch (error) {
     console.error('删除旧头像失败:', error);
   }
 };
+
 
 module.exports = router;

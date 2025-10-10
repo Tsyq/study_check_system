@@ -34,6 +34,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 import api from '../services/api';
+import { getAvatarUrl } from '../utils/avatar';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -63,6 +64,7 @@ interface Checkin {
     user: {
       _id: string;
       username: string;
+      avatar?: string;
     };
     createdAt: string;
   }>;
@@ -556,7 +558,7 @@ const Social: React.FC = () => {
       <List.Item>
         <div style={{ width: '100%' }}>
           <Space style={{ marginBottom: 8 }}>
-            <Avatar>{it.fromUser?.username?.[0] || 'U'}</Avatar>
+            <Avatar src={getAvatarUrl(it.fromUser?.avatar)} icon={<UserOutlined />}>{it.fromUser?.username?.[0] || 'U'}</Avatar>
             <Text strong>{it.fromUser?.username || '用户'}</Text>
             <Text type="secondary">
               {it.type === 'like' ? '点赞了你的打卡' : '评论了你的打卡'}
@@ -603,7 +605,7 @@ const Social: React.FC = () => {
       <Card size="small" style={{ width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Avatar src={item.user?.avatar || undefined}>{item.user?.username?.[0] || 'U'}</Avatar>
+            <Avatar src={getAvatarUrl(item.user?.avatar)}>{item.user?.username?.[0] || 'U'}</Avatar>
             <div style={{ marginLeft: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Button type="link" size="small" onClick={() => handleClickUsername(item.user?._id)} style={{ paddingLeft: 0 }}>
@@ -688,7 +690,7 @@ const Social: React.FC = () => {
               renderItem={(cm: any) => (
                 <List.Item>
                   <Space>
-                    <Avatar size="small">{cm.user?.username?.[0] || 'U'}</Avatar>
+                    <Avatar size="small" src={getAvatarUrl(cm.user?.avatar)} icon={<UserOutlined />}>{cm.user?.username?.[0] || 'U'}</Avatar>
                     <Text strong>{cm.user?.username || '用户'}</Text>
                     <Text>{cm.content}</Text>
                     {cm.createdAt && (
@@ -823,7 +825,7 @@ const Social: React.FC = () => {
                       <List.Item style={{ padding: '12px 0' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                           <Space>
-                            <Avatar src={u.avatar || undefined} size="large">{u.username?.[0] || 'U'}</Avatar>
+                            <Avatar src={getAvatarUrl(u.avatar)} size="large">{u.username?.[0] || 'U'}</Avatar>
                             <div>
                               <Button type="link" onClick={() => handleClickUsername(u._id)} style={{ padding: 0, height: 'auto' }}>
                                 <Text strong style={{ fontSize: 16 }}>{u.username}</Text>
@@ -901,7 +903,7 @@ const Social: React.FC = () => {
                     renderItem={(u: any) => (
                       <List.Item>
                         <Space>
-                          <Avatar src={u.avatar || undefined}>{u.username?.[0] || 'U'}</Avatar>
+                          <Avatar src={getAvatarUrl(u.avatar)}>{u.username?.[0] || 'U'}</Avatar>
                           <Button type="link" onClick={() => handleClickUsername(u._id)}>{u.username}</Button>
                           <Button size="small" onClick={() => handleUnfollow(u._id)}>取关</Button>
                         </Space>
@@ -936,7 +938,7 @@ const Social: React.FC = () => {
                     renderItem={(u: any) => (
                       <List.Item>
                         <Space>
-                          <Avatar src={u.avatar || undefined}>{u.username?.[0] || 'U'}</Avatar>
+                          <Avatar src={getAvatarUrl(u.avatar)}>{u.username?.[0] || 'U'}</Avatar>
                           <Button type="link" onClick={() => handleClickUsername(u._id)}>{u.username}</Button>
                         </Space>
                       </List.Item>
@@ -1001,7 +1003,7 @@ const Social: React.FC = () => {
         title={
           selectedUser ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Avatar src={selectedUser.avatar || undefined} size="large">
+              <Avatar src={getAvatarUrl(selectedUser.avatar)} size="large">
                 {selectedUser.username?.[0] || 'U'}
               </Avatar>
               <div>
@@ -1088,7 +1090,7 @@ const Social: React.FC = () => {
                       <Card size="small" style={{ width: '100%' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                           <div style={{ display: 'flex', alignItems: 'center' }}>
-                            <Avatar src={item.user?.avatar || undefined}>{item.user?.username?.[0] || 'U'}</Avatar>
+                            <Avatar src={getAvatarUrl(item.user?.avatar)}>{item.user?.username?.[0] || 'U'}</Avatar>
                             <div style={{ marginLeft: 12 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <Text strong>{item.user?.username || '未知用户'}</Text>
@@ -1157,7 +1159,7 @@ const Social: React.FC = () => {
                               renderItem={(cm: any) => (
                                 <List.Item>
                                   <Space>
-                                    <Avatar size="small">{cm.user?.username?.[0] || 'U'}</Avatar>
+                                    <Avatar size="small" src={getAvatarUrl(cm.user?.avatar)} icon={<UserOutlined />}>{cm.user?.username?.[0] || 'U'}</Avatar>
                                     <Text strong>{cm.user?.username || '用户'}</Text>
                                     <Text>{cm.content}</Text>
                                     {cm.createdAt && (
