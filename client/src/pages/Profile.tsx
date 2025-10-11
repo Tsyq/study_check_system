@@ -77,7 +77,7 @@ const Profile: React.FC = () => {
     if (user?.id) {
       fetchProfile();
     }
-  }, [user?.id, fetchProfile]);
+  }, [user?.id]); // 移除 fetchProfile 依赖，避免无限循环
 
   const handleEdit = () => {
     setEditing(true);
