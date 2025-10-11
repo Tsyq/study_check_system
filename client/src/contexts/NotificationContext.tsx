@@ -44,36 +44,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   const { user, token } = useAuth();
 
   const fetchNotifications = async () => {
-    if (!user?.id || user.id === 0) {
-      // 演示模式，使用模拟数据
-      const demoNotifications: NotificationItem[] = [
-        {
-          type: 'like',
-          createdAt: new Date(Date.now() - 3600000).toISOString(),
-          checkinId: '1',
-          fromUser: {
-            _id: 'user1',
-            username: '小明',
-            avatar: ''
-          }
-        },
-        {
-          type: 'comment',
-          createdAt: new Date(Date.now() - 7200000).toISOString(),
-          content: '加油！',
-          checkinId: '2',
-          fromUser: {
-            _id: 'user2',
-            username: '小红',
-            avatar: ''
-          }
-        }
-      ];
-      setNotifications(demoNotifications);
-      setUnreadCount(demoNotifications.length);
-      return;
-    }
-
     if (!token) return;
 
     setLoading(true);
@@ -99,12 +69,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
   // 定期刷新通知（每30秒）
   useEffect(() => {
-    if (user?.id && user.id !== 0) {
+    if (token) {
       fetchNotifications();
       const interval = setInterval(fetchNotifications, 30000);
       return () => clearInterval(interval);
     }
-  }, [user?.id, token]);
+  }, [token]);
 
   const value: NotificationContextType = {
     notifications,

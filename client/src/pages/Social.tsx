@@ -101,124 +101,7 @@ const Social: React.FC = () => {
   const [userModalLoading, setUserModalLoading] = useState(false);
 
   useEffect(() => {
-    if (user?.id === 'demo-user') {
-      // 演示模式，使用模拟数据
-      const demoCheckins: Checkin[] = [
-        {
-          _id: '1',
-          content: '今天学习了React Hooks，感觉对状态管理有了更深的理解！',
-          studyTime: 120,
-          subject: '编程',
-          mood: 'happy',
-          createdAt: new Date().toISOString(),
-          user: { _id: 'demo-user', username: '演示用户', avatar: '' },
-          likes: [{ user: { _id: 'user1', username: '小明' } }],
-          comments: [{ _id: '1', content: '加油！', user: { _id: 'user1', username: '小明' }, createdAt: new Date().toISOString() }]
-        },
-        {
-          _id: '2',
-          content: '完成了数学作业，解出了几道难题，很有成就感！',
-          studyTime: 90,
-          subject: '数学',
-          mood: 'excited',
-          createdAt: new Date(Date.now() - 86400000).toISOString(),
-          user: { _id: 'demo-user', username: '演示用户', avatar: '' },
-          likes: [],
-          comments: []
-        },
-        {
-          _id: '3',
-          content: '英语阅读练习，今天读了一篇关于AI的文章，学到了很多新词汇！',
-          studyTime: 60,
-          subject: '英语',
-          mood: 'normal',
-          createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
-          user: { _id: 'user2', username: '小红', avatar: '' },
-          likes: [{ user: { _id: 'demo-user', username: '演示用户' } }],
-          comments: []
-        }
-      ];
-
-      // 模拟关注和粉丝数据
-      const demoFollowing = [
-        {
-          _id: 'user1',
-          username: '小明',
-          avatar: '',
-          bio: '热爱编程的学习者',
-          totalStudyTime: 1200,
-          streak: 15
-        },
-        {
-          _id: 'user2',
-          username: '小红',
-          avatar: '',
-          bio: '英语学习达人',
-          totalStudyTime: 800,
-          streak: 8
-        }
-      ];
-
-      const demoFollowers = [
-        {
-          _id: 'user3',
-          username: '小李',
-          avatar: '',
-          bio: '数学爱好者',
-          totalStudyTime: 1500,
-          streak: 20
-        },
-        {
-          _id: 'user4',
-          username: '小王',
-          avatar: '',
-          bio: '前端开发者',
-          totalStudyTime: 2000,
-          streak: 25
-        }
-      ];
-
-      // 模拟消息数据
-      const demoReceivedItems = [
-        {
-          type: 'like',
-          createdAt: new Date(Date.now() - 3600000).toISOString(),
-          checkinId: '1',
-          fromUser: {
-            _id: 'user1',
-            username: '小明',
-            avatar: ''
-          }
-        },
-        {
-          type: 'comment',
-          createdAt: new Date(Date.now() - 7200000).toISOString(),
-          content: '加油！',
-          checkinId: '2',
-          fromUser: {
-            _id: 'user2',
-            username: '小红',
-            avatar: ''
-          }
-        }
-      ];
-
-      setFeedCheckins(demoCheckins);
-      setAllCheckins(demoCheckins);
-      setMyCheckins(demoCheckins.filter(c => c.user._id === 'demo-user')); // 只显示当前用户的动态
-      setMyFollowing(demoFollowing);
-      setMyFollowers(demoFollowers);
-      setReceivedItems(demoReceivedItems);
-      setFollowingIds(new Set(demoFollowing.map(u => u._id)));
-      
-      // 为演示数据添加动态详情
-      setCheckinDetails({
-        '1': { content: '今天学习了React，完成了组件开发，感觉很有成就感！', subject: '编程', studyTime: 120 },
-        '2': { content: '完成了数学作业，解出了几道难题，很有成就感！', subject: '数学', studyTime: 90 }
-      });
-      
-      setLoading(false);
-    } else {
+    if (user?.id) {
       // 同步关注ID集合和粉丝数据
       fetchFollowingIds();
       fetchFollowers();
@@ -246,22 +129,14 @@ const Social: React.FC = () => {
 
   // 获取消息中动态的详情
   useEffect(() => {
-    console.log('useEffect触发 - receivedItems:', receivedItems, 'demoMode:', user?.demoMode);
     if (receivedItems.length > 0) {
       receivedItems.forEach(item => {
-        console.log('处理消息项:', item);
         if (item.checkinId && !checkinDetails[item.checkinId]) {
-          console.log('需要获取动态详情:', item.checkinId);
-          if (user?.demoMode) {
-            // 在demo模式下，动态详情已经在初始化时设置了
-            console.log('demo模式，跳过API调用');
-          } else {
-            fetchCheckinDetails(item.checkinId);
-          }
+          fetchCheckinDetails(item.checkinId);
         }
       });
     }
-  }, [receivedItems, user?.demoMode]);
+  }, [receivedItems]);
 
   const fetchFeed = async () => {
     setLoading(true);

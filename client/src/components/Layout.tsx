@@ -15,17 +15,12 @@ import {
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { getAvatarUrl } from '../utils/avatar';
 import './Layout.css';
 
 const { Header, Sider, Content } = AntLayout;
 const { Text } = Typography;
 
-// 处理头像URL的函数
-const getAvatarUrl = (avatar: string | undefined) => {
-  if (!avatar) return undefined;
-  if (avatar.startsWith('http')) return avatar;
-  return `http://localhost:5000${avatar}`;
-};
 
 const Layout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
@@ -105,7 +100,13 @@ const Layout: React.FC = () => {
       label: (
         <div style={{ padding: '8px 0' }}>
           <Space>
-            <Avatar size="small">{notification.fromUser.username[0]}</Avatar>
+            <Avatar 
+              size="small" 
+              src={getAvatarUrl(notification.fromUser.avatar)}
+              icon={<UserOutlined />}
+            >
+              {notification.fromUser.username[0]}
+            </Avatar>
             <div>
               <div style={{ fontSize: 12 }}>
                 {notification.type === 'like' 

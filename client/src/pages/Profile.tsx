@@ -58,16 +58,20 @@ const Profile: React.FC = () => {
   const [fileSizeModalVisible, setFileSizeModalVisible] = useState(false);
   const [fileSizeInfo, setFileSizeInfo] = useState({ name: '', size: 0 });
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   const fetchProfile = useCallback(async () => {
     try {
       const response = await api.get('/auth/me');
       setProfile(response.data.user);
       form.setFieldsValue(response.data.user);
+      // 同步更新全局用户信息
+      updateUser(response.data.user);
     } catch (error) {
       message.error('获取个人信息失败');
     }
-  }, [form]);
+  }, [form, updateUser]);
 
   useEffect(() => {
     if (user?.id) {
@@ -82,9 +86,32 @@ const Profile: React.FC = () => {
   const handleSave = async (values: any) => {
     setLoading(true);
     try {
+      // 如果有选中的头像文件，先上传头像
+      if (selectedAvatarFile) {
+        const formData = new FormData();
+        formData.append('avatar', selectedAvatarFile);
+        
+        const uploadResponse = await api.post('/upload/avatar', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        if (uploadResponse.data && uploadResponse.data.avatarUrl) {
+          values.avatar = uploadResponse.data.avatarUrl;
+        }
+      }
+      
+      // 更新个人信息
       await api.put('/auth/profile', values);
       message.success('个人信息更新成功');
       setEditing(false);
+      
+      // 清除头像相关状态
+      setSelectedAvatarFile(null);
+      setAvatarPreview(null);
+      
       fetchProfile();
       updateUser(values);
     } catch (error: any) {
@@ -97,6 +124,9 @@ const Profile: React.FC = () => {
   const handleCancel = () => {
     setEditing(false);
     form.setFieldsValue(profile);
+    // 清除头像相关状态
+    setSelectedAvatarFile(null);
+    setAvatarPreview(null);
   };
 
   const handlePasswordChange = async (values: any) => {
@@ -167,31 +197,36 @@ const Profile: React.FC = () => {
   };
 
   const handleAvatarChange = (info: any) => {
-    console.log('头像上传状态变化:', {
-      status: info.file?.status,
-      name: info.file?.name,
-      percent: info.file?.percent,
-      response: info.file?.response,
-      error: info.file?.error
-    });
+    const file = info.file.originFileObj || info.file;
     
-    if (info.file.status === 'uploading') {
-      console.log('上传进度:', info.file.percent + '%');
-      return;
-    }
-    if (info.file.status === 'done') {
-      message.success('头像上传成功');
-      console.log('上传响应:', info.file.response);
-      // 更新本地头像显示
-      if (info.file.response && info.file.response.avatarUrl) {
-        setProfile(prev => prev ? { ...prev, avatar: info.file.response.avatarUrl } : null);
+    if (file) {
+      // 验证文件类型
+      const isImage = file.type.startsWith('image/');
+      if (!isImage) {
+        message.error('只能上传图片文件!');
+        return;
       }
-      fetchProfile(); // 重新获取用户信息
-    } else if (info.file.status === 'error') {
-      console.error('头像上传失败:', info.file.error);
-      message.error('头像上传失败: ' + (info.file.error?.message || '未知错误'));
-    } else {
-      console.log('未知状态:', info.file.status);
+      
+      // 验证文件大小
+      const isLt10M = file.size / 1024 / 1024 < 10;
+      if (!isLt10M) {
+        setFileSizeInfo({
+          name: file.name,
+          size: file.size
+        });
+        setFileSizeModalVisible(true);
+        return;
+      }
+      
+      // 设置选中的文件
+      setSelectedAvatarFile(file);
+      
+      // 创建预览URL
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setAvatarPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -208,80 +243,14 @@ const Profile: React.FC = () => {
                 name="avatar"
                 listType="picture-circle"
                 showUploadList={false}
-                action="http://localhost:5000/api/upload/avatar"
-                headers={{
-                  'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }}
                 onChange={handleAvatarChange}
                 disabled={!editing}
-                beforeUpload={async (file) => {
-                  console.log('beforeUpload 检查文件:', {
-                    name: file.name,
-                    type: file.type,
-                    size: file.size,
-                    sizeMB: (file.size / 1024 / 1024).toFixed(2)
-                  });
-                  
-                  const isImage = file.type.startsWith('image/');
-                  if (!isImage) {
-                    console.log('文件类型检查失败:', file.type);
-                    message.error('只能上传图片文件!');
-                    return false;
-                  }
-                  
-                  // 如果文件大于2MB，自动压缩
-                  if (file.size > 2 * 1024 * 1024) {
-                    console.log('文件较大，开始压缩...');
-                    try {
-                      const compressedFile = await compressImage(file, 200, 0.8);
-                      console.log('压缩完成:', {
-                        原始大小: (file.size / 1024 / 1024).toFixed(2) + 'MB',
-                        压缩后大小: (compressedFile.size / 1024 / 1024).toFixed(2) + 'MB'
-                      });
-                      
-                      // 替换原始文件，保持uid属性
-                      const fileWithUid = Object.assign(compressedFile, {
-                        uid: file.uid
-                      });
-                      
-                      // 如果压缩后仍然太大，显示提醒
-                      if (compressedFile.size > 10 * 1024 * 1024) {
-                        setFileSizeInfo({
-                          name: file.name,
-                          size: compressedFile.size
-                        });
-                        setFileSizeModalVisible(true);
-                        return false;
-                      }
-                      
-                      return fileWithUid;
-                    } catch (error) {
-                      console.error('图片压缩失败:', error);
-                      message.error('图片压缩失败，请选择较小的图片');
-                      return false;
-                    }
-                  }
-                  
-                  // 检查文件大小限制
-                  const isLt10M = file.size / 1024 / 1024 < 10;
-                  if (!isLt10M) {
-                    console.log('文件大小检查失败:', (file.size / 1024 / 1024).toFixed(2) + 'MB');
-                    setFileSizeInfo({
-                      name: file.name,
-                      size: file.size
-                    });
-                    setFileSizeModalVisible(true);
-                    return false;
-                  }
-                  
-                  console.log('文件检查通过，开始上传');
-                  return true;
-                }}
+                beforeUpload={() => false} // 阻止自动上传
               >
                 <div style={{ position: 'relative' }}>
                   <Avatar 
                     size={120} 
-                    src={getAvatarUrl(profile?.avatar)} 
+                    src={avatarPreview || getAvatarUrl(profile?.avatar)} 
                     icon={<UserOutlined />}
                   />
                   {editing && (
